@@ -148,14 +148,3 @@ unique, err := tpmcrypto.NewECCKeyUnique(tpm2.TPMECCNistP256)
 ### Hash Algorithms
 - SHA-256, SHA-384, SHA-512
 - Automatic selection based on key size/curve
-
-## Security Considerations
-
-- All public keys are validated for minimum secure sizes
-- Only secure elliptic curves are accepted
-- RSA keys must be at least 2048 bits
-- ECC keys must be at least 256 bits
-
-## License
-
-See [LICENSE](../LICENSE) file in the repository root.
