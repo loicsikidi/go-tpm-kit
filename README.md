@@ -7,7 +7,7 @@
 This library aims to be a swiss-army knife for working with TPMs in Go.
 
 > [!WARNING]
-> ⚠️ This tool is currently in beta mode and its usage of might change without announcements.
+> ⚠️ This tool is currently in beta mode and its usage might change without announcements.
 >
 > *Note: once the API will be stable `v1.0.0` will be released.*
 
@@ -22,14 +22,17 @@ I've seen myself re-implementing similar functionalities across different projec
 > [!IMPORTANT]
 > `go-tpm-kit` only supports "TPMDirect" API (ie, [`go-tpm/tpm2`](https://pkg.go.dev/github.com/google/go-tpm/tpm2) package). In other words, it does not  (and won't) support the legacy API (ie, [`go-tpm/legacy/tpm2`](https://pkg.go.dev/github.com/google/go-tpm/legacy/tpm2) package).
 
-* [`tpmutil`](./tpmutil/) package provides utility functions to interact with TPMs (e.g., reading/writing NV indices, managing sessions, etc.)
-  * this package ***will*** perform operations with the TPM
-* [`tpmcrypto`](./tpmcrypto/) package provides cryptographic utilities and abstractions for working with TPM keys and signatures
-  * this package ***will not*** perform any operation with the TPM
+| Package | Description | Require TPM Connection |
+|---------|-------------|:----------------------:|
+| [`tpmutil`](./tpmutil/) | Provides utility functions to interact with TPMs (e.g., reading/writing NV indices, managing sessions, etc.) | ✅ |
+| [`tpmcrypto`](./tpmcrypto/) | Provides cryptographic utilities and abstractions for working with TPM keys and signatures | ❌ |
+| [`tpmsession`](./tpmsession/) | Provides utilities for creating and managing encrypted TPM sessions (ie. parameter encryption, HMAC protection and Audit)  | ✅ |
 
 ## Dependencies
 
-This repo **only** depends on [`go-tpm`](https://github.com/google/go-tpm).
+This repo depends on:
+* [`go-tpm`](https://github.com/google/go-tpm) - TPM 2.0 library for Go
+* [`golang.org/x/term`](https://pkg.go.dev/golang.org/x/term) - Terminal utilities for secure password input
 
 ## Development
 

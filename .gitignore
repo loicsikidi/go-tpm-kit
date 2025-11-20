@@ -28,6 +28,10 @@ vendor/
 *~
 .DS_Store
 
+# AI assistant
+.claude/
+GOAL.md
+
 # Nix build artifacts
 result
 result-*
