@@ -1,11 +1,12 @@
+package tpmutil
+
 /*
-This file hosts helpers that that as arguments tpm2 commands instead of config structs.
+This file hosts helpers that got tpm2 commands as arguments instead of config structs.
 
 Ideally, for consistency, all helpers should use the same pattern. I need to figure out which pattern is the best.
 
 Meanwhile, to avoid confusion, I put helpers that use tpm2 commands in this separate file.
 */
-package tpmutil
 
 import (
 	"github.com/google/go-tpm/tpm2"
