@@ -54,7 +54,7 @@ func getSRK(t *testing.T, tpm transport.TPM, handle tpm2.TPMHandle) (name, publi
 
 	h, err := tpmutil.GetSKRHandle(tpm, &tpmutil.ParentConfig{
 		Handle:    tpmutil.NewHandle(handle),
-		KeyType:   tpmutil.RSA,
+		KeyFamily: tpmutil.RSA,
 		Hierarchy: tpm2.TPMRHOwner,
 	})
 	if err != nil {
