@@ -2,6 +2,7 @@ package tpmutil
 
 import (
 	"crypto"
+	"fmt"
 
 	"github.com/google/go-tpm/tpm2"
 	tpmkit "github.com/loicsikidi/go-tpm-kit"
@@ -168,10 +169,10 @@ type ParentConfig struct {
 	//
 	// Default: [tpmkit.SRKHandle].
 	Handle Handle
-	// KeyType is the type of the key to be created under the parent.
+	// KeyFamily is the type of the key to be created under the parent.
 	//
 	// Default: [ECC] (to save key generation time).
-	KeyType KeyType
+	KeyFamily KeyFamily
 	// Hierarchy specifies which TPM hierarchy to use.
 	//
 	// Default: [tpm2.TPMRHOwner].
@@ -187,14 +188,71 @@ func (c *ParentConfig) CheckAndSetDefault() error {
 	if c.Handle == nil {
 		c.Handle = NewHandle(tpmkit.SRKHandle)
 	}
-	if c.KeyType == 0 {
-		c.KeyType = ECC
+	if c.KeyFamily == 0 {
+		c.KeyFamily = ECC
 	}
 	if c.Hierarchy == 0 {
 		c.Hierarchy = tpm2.TPMRHOwner
 	}
 	if c.Auth == nil {
 		c.Auth = NoAuth
+	}
+	return nil
+}
+
+type EKParentConfig struct {
+	ParentConfig
+	// Transient key handle represents the current EK key
+	// that we want to persist.
+	//
+	// If nil, a new key will be created based on KeyType and IsLowRange.
+	// Default: nil
+	TransientKey Handle
+	// KeyType specifies the type of EK to create if TransientKey is nil.
+	//
+	// Default: 0
+	KeyType KeyType
+	// IsLowRange indicates whether to use low-range templates for EK creation
+	// if TransientKey is nil.
+	//
+	// Note: this field is taken into account only if KeyType is RSA2048 or ECCNISTP256.
+	IsLowRange bool
+	// Force indicates whether to evict an existing key at the target handle
+	// before persisting the new key.
+	//
+	// Default: false
+	Force bool
+}
+
+func (c *EKParentConfig) CheckAndSetDefault() error {
+	if c.KeyFamily == 0 {
+		c.KeyFamily = RSA
+	}
+	if c.Handle == nil {
+		if c.KeyFamily == RSA {
+			c.Handle = NewHandle(tpm2.TPMHandle(RSAEKHandle))
+		}
+		if c.KeyFamily == ECC {
+			c.Handle = NewHandle(tpm2.TPMHandle(ECCEKHandle))
+		}
+
+	}
+	if c.Hierarchy == 0 {
+		c.Hierarchy = tpm2.TPMRHEndorsement
+	}
+	if c.Auth == nil {
+		c.Auth = NoAuth
+	}
+	if c.TransientKey != nil {
+		if c.TransientKey.Type() != TransientHandle {
+			return fmt.Errorf("invalid value: 'TransientKey' must be a transient TPM handle (got %v)", c.TransientKey.Type())
+		}
+		if c.KeyType == UnspecifiedAlgo {
+			return fmt.Errorf("invalid value: 'KeyType' must be specified (got %v)", c.KeyType)
+		}
+		if len(c.TransientKey.Name().Buffer) == 0 {
+			return fmt.Errorf("invalid value: 'TransientKey' must have a valid Name")
+		}
 	}
 	return nil
 }

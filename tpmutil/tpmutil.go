@@ -421,13 +421,13 @@ func GetSKRHandle(t transport.TPM, cfg *ParentConfig) (Handle, error) {
 	rerr := err // Preserve this failure for later logging, if needed
 
 	var srkTemplate tpm2.TPMTPublic
-	switch cfg.KeyType {
+	switch cfg.KeyFamily {
 	case RSA:
-		srkTemplate = defaultRSASRKTemplate
+		srkTemplate = RSASRKTemplate
 	case ECC:
-		srkTemplate = defaultECCSRKTemplate
+		srkTemplate = ECCSRKTemplate
 	default:
-		return nil, fmt.Errorf("unsupported SRK KeyType: %v", cfg.KeyType)
+		return nil, fmt.Errorf("unsupported SRK KeyType: %v", cfg.KeyFamily)
 	}
 
 	srkCreateCmd := tpm2.CreatePrimary{
@@ -463,5 +463,177 @@ func GetSKRHandle(t transport.TPM, cfg *ParentConfig) (Handle, error) {
 	})
 
 	return final, nil
+}
 
+// GetEKHandle retrieves the Endorsement Key (EK) handle from the TPM.
+// Unlike [GetSKRHandle], this function does not create the EK if it doesn't exist.
+//
+// Example:
+//
+//	// Get RSA EK at the default persistent handle
+//	ekHandle, err := tpmutil.GetEKHandle(tpm, &tpmutil.EKParentConfig{
+//		ParentConfig: tpmutil.ParentConfig{
+//			KeyFamily: tpmutil.RSA,
+//		},
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Printf("EK handle: 0x%x\n", ekHandle.Handle())
+//
+// Note: If cfg is nil, default configuration is used (RSA EK at handle 0x81010001).
+func GetEKHandle(t transport.TPM, cfg *EKParentConfig) (Handle, error) {
+	if cfg == nil {
+		cfg = &EKParentConfig{}
+	}
+	if err := cfg.CheckAndSetDefault(); err != nil {
+		return nil, err
+	}
+
+	readPublicRsp, err := tpm2.ReadPublic{
+		ObjectHandle: cfg.Handle.Handle(),
+	}.Execute(t)
+	if err != nil {
+		return nil, &ErrHandleNotFound{
+			Handle: cfg.Handle.Handle(),
+			Err:    err,
+		}
+	}
+
+	h := &tpm2.NamedHandle{Name: readPublicRsp.Name, Handle: cfg.Handle.Handle()}
+	return NewHandle(h), nil
+}
+
+// getEKTemplate returns the appropriate EK template based on KeyType and IsLowRange.
+func getEKTemplate(keyType KeyType, isLowRange bool) (tpm2.TPMTPublic, error) {
+	switch keyType {
+	case RSA2048:
+		if isLowRange {
+			return RSAEKTemplate, nil
+		}
+		return RSA2048EKTemplate, nil
+	case RSA3072:
+		return RSA3072EKTemplate, nil
+	case RSA4096:
+		return RSA4096EKTemplate, nil
+	case ECCNISTP256:
+		if isLowRange {
+			return ECCEKTemplate, nil
+		}
+		return ECCP256EKTemplate, nil
+	case ECCNISTP384:
+		return ECCP384EKTemplate, nil
+	case ECCNISTP521:
+		return ECCP521EKTemplate, nil
+	case ECCSM2P256:
+		return ECCSM2P256EKTemplate, nil
+	default:
+		return tpm2.TPMTPublic{}, fmt.Errorf("unsupported EK KeyType: %v", keyType)
+	}
+}
+
+// PersistEK persists an Endorsement Key (EK) to the TPM at the configured handle.
+//
+// If cfg.TransientKey is nil, a new transient EK is created based on cfg.KeyType
+// and cfg.IsLowRange. Otherwise, the provided transient key is persisted.
+//
+// Example:
+//
+//	// Create and persist a new RSA EK
+//	ekHandle, err := tpmutil.PersistEK(tpm, &tpmutil.EKParentConfig{
+//		ParentConfig: tpmutil.ParentConfig{
+//			KeyFamily: tpmutil.RSA,
+//		},
+//		KeyType:    tpmutil.RSA2048,
+//		IsLowRange: true,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Printf("Persisted EK at handle: 0x%x\n", ekHandle.Handle())
+//
+// Note: If cfg is nil, default configuration is used.
+func PersistEK(t transport.TPM, cfg *EKParentConfig) (Handle, error) {
+	if cfg == nil {
+		cfg = &EKParentConfig{}
+	}
+	if err := cfg.CheckAndSetDefault(); err != nil {
+		return nil, err
+	}
+
+	// Check if a key already exists at the target handle
+	existingHandle, err := GetEKHandle(t, cfg)
+	if err == nil {
+		// Key exists at the target handle
+		if !cfg.Force {
+			return nil, fmt.Errorf("key already exists at handle 0x%x (use Force to overwrite)", cfg.Handle.Handle())
+		}
+
+		// Evict the existing key
+		_, evictErr := tpm2.EvictControl{
+			Auth: tpm2.AuthHandle{
+				Handle: tpm2.TPMRHOwner,
+				Auth:   NoAuth,
+			},
+			ObjectHandle:     existingHandle,
+			PersistentHandle: cfg.Handle.Handle(),
+		}.Execute(t)
+		if evictErr != nil {
+			return nil, fmt.Errorf("failed to evict existing key at handle 0x%x: %w", cfg.Handle.Handle(), evictErr)
+		}
+	}
+
+	var transientHandle tpm2.TPMHandle
+	var name tpm2.TPM2BName
+
+	if cfg.TransientKey == nil {
+		template, err := getEKTemplate(cfg.KeyType, cfg.IsLowRange)
+		if err != nil {
+			return nil, err
+		}
+
+		createCmd := tpm2.CreatePrimary{
+			PrimaryHandle: tpm2.AuthHandle{
+				Handle: cfg.Hierarchy,
+				Auth:   cfg.Auth,
+			},
+			InPublic: tpm2.New2B(template),
+		}
+
+		ekHandle, err := CreatePrimary(t, createCmd)
+		if err != nil {
+			return nil, fmt.Errorf("CreatePrimary failed: %w", err)
+		}
+		defer ekHandle.Close() //nolint:errcheck
+
+		transientHandle = ekHandle.Handle()
+		name = ekHandle.Name()
+	} else {
+		// Use the provided transient key
+		transientHandle = cfg.TransientKey.Handle()
+		name = cfg.TransientKey.Name()
+	}
+
+	_, err = tpm2.EvictControl{
+		Auth: tpm2.AuthHandle{
+			Handle: tpm2.TPMRHOwner,
+			Auth:   NoAuth,
+		},
+		ObjectHandle: &tpm2.NamedHandle{
+			Handle: transientHandle,
+			Name:   name,
+		},
+		PersistentHandle: cfg.Handle.Handle(),
+	}.Execute(t)
+	if err != nil {
+		return nil, fmt.Errorf("EvictControl failed: %w", err)
+	}
+
+	// Return the persistent handle
+	persistedHandle := NewHandle(&tpm2.NamedHandle{
+		Handle: cfg.Handle.Handle(),
+		Name:   name,
+	})
+
+	return persistedHandle, nil
 }
