@@ -29,7 +29,7 @@ in
     hardeningDisable = ["fortify"];
 
     env = {
-      # Required to run tests with -race flag
+      # Enable CGO
       CGO_ENABLED = "1";
 
       # Disable warnings from TPM simulator C code
