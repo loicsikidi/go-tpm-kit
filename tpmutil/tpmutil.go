@@ -460,9 +460,7 @@ func GetSKRHandle(t transport.TPM, optionalCfg ...ParentConfig) (Handle, error) 
 //
 //	// Get RSA EK at the default persistent handle
 //	ekHandle, err := tpmutil.GetEKHandle(tpm, &tpmutil.EKParentConfig{
-//		ParentConfig: tpmutil.ParentConfig{
-//			KeyFamily: tpmutil.RSA,
-//		},
+//		KeyFamily: tpmutil.RSA,
 //	})
 //	if err != nil {
 //		log.Fatal(err)
@@ -527,9 +525,7 @@ func getEKTemplate(keyType KeyType, isLowRange bool) (tpm2.TPMTPublic, error) {
 //
 //	// Create and persist a new RSA EK
 //	ekHandle, err := tpmutil.PersistEK(tpm, &tpmutil.EKParentConfig{
-//		ParentConfig: tpmutil.ParentConfig{
-//			KeyFamily: tpmutil.RSA,
-//		},
+//		KeyFamily:  tpmutil.RSA,
 //		KeyType:    tpmutil.RSA2048,
 //		IsLowRange: true,
 //	})
@@ -553,7 +549,7 @@ func PersistEK(t transport.TPM, optionalCfg ...EKParentConfig) (Handle, error) {
 			return nil, fmt.Errorf("key already exists at handle 0x%x (use Force to overwrite)", cfg.Handle.Handle())
 		}
 
-		// Evict the existing key
+		// Remove the existing key
 		_, evictErr := tpm2.EvictControl{
 			Auth: tpm2.AuthHandle{
 				Handle: tpm2.TPMRHOwner,
