@@ -201,7 +201,22 @@ func (c *ParentConfig) CheckAndSetDefault() error {
 }
 
 type EKParentConfig struct {
-	ParentConfig
+	// KeyFamily is the type of the key to be created under the parent.
+	//
+	// Default: [ECC].
+	KeyFamily KeyFamily
+	// Handle is the handle of the parent key.
+	//
+	// Default: [RSAEKHandle] or [ECCEKHandle] based on KeyFamily.
+	Handle Handle
+	// Hierarchy specifies which TPM hierarchy to use.
+	//
+	// Default: [tpm2.TPMRHEndorsement].
+	Hierarchy tpm2.TPMHandle
+	// Auth is the authorization session for the parent key.
+	//
+	// Default: [NoAuth].
+	Auth tpm2.Session
 	// Transient key handle represents the current EK key
 	// that we want to persist.
 	//
@@ -226,14 +241,14 @@ type EKParentConfig struct {
 
 func (c *EKParentConfig) CheckAndSetDefault() error {
 	if c.KeyFamily == 0 {
-		c.KeyFamily = RSA
+		c.KeyFamily = ECC
 	}
 	if c.Handle == nil {
 		if c.KeyFamily == RSA {
-			c.Handle = NewHandle(tpm2.TPMHandle(RSAEKHandle))
+			c.Handle = NewHandle(RSAEKHandle)
 		}
 		if c.KeyFamily == ECC {
-			c.Handle = NewHandle(tpm2.TPMHandle(ECCEKHandle))
+			c.Handle = NewHandle(ECCEKHandle)
 		}
 
 	}

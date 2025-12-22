@@ -36,9 +36,7 @@ func TestGetEKHandle_NotFound(t *testing.T) {
 			defer thetpm.Close()
 
 			cfg := tpmutil.EKParentConfig{
-				ParentConfig: tpmutil.ParentConfig{
-					KeyFamily: tt.keyFamily,
-				},
+				KeyFamily: tt.keyFamily,
 			}
 			_, err = tpmutil.GetEKHandle(thetpm, cfg)
 			if err == nil {
@@ -115,9 +113,7 @@ func TestGetEKHandle_AlreadyPersisted(t *testing.T) {
 
 			// Now try to get the EK
 			cfg := tpmutil.EKParentConfig{
-				ParentConfig: tpmutil.ParentConfig{
-					KeyFamily: tt.keyFamily,
-				},
+				KeyFamily: tt.keyFamily,
 			}
 			handle, err := tpmutil.GetEKHandle(thetpm, cfg)
 			if err != nil {
@@ -185,10 +181,8 @@ func TestGetEKHandle_CustomHandle(t *testing.T) {
 
 	// Try to get the EK at the custom handle
 	cfg := tpmutil.EKParentConfig{
-		ParentConfig: tpmutil.ParentConfig{
-			KeyFamily: tpmutil.RSA,
-			Handle:    tpmutil.NewHandle(customHandle),
-		},
+		KeyFamily: tpmutil.RSA,
+		Handle:    tpmutil.NewHandle(customHandle),
 	}
 	handle, err := tpmutil.GetEKHandle(thetpm, cfg)
 	if err != nil {
@@ -225,11 +219,11 @@ func TestGetEKHandle_DefaultConfig(t *testing.T) {
 	}
 	defer thetpm.Close()
 
-	// Create and persist an RSA EK at default handle
+	// Create and persist an ECC EK at default handle
 	ekHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHEndorsement,
 		Auth:          tpmutil.NoAuth,
-		Template:      tpmutil.RSAEKTemplate,
+		Template:      tpmutil.ECCEKTemplate,
 	})
 	if err != nil {
 		t.Fatalf("CreatePrimary failed: %v", err)
@@ -243,7 +237,7 @@ func TestGetEKHandle_DefaultConfig(t *testing.T) {
 			Auth:   tpmutil.NoAuth,
 		},
 		ObjectHandle:     ekHandle,
-		PersistentHandle: tpmutil.RSAEKHandle,
+		PersistentHandle: tpmutil.ECCEKHandle,
 	}.Execute(thetpm)
 	if err != nil {
 		t.Fatalf("EvictControl failed: %v", err)
@@ -255,11 +249,11 @@ func TestGetEKHandle_DefaultConfig(t *testing.T) {
 		t.Fatalf("GetEKHandle with nil config failed: %v", err)
 	}
 
-	if handle.Handle() != tpmutil.RSAEKHandle {
-		t.Errorf("Expected default handle 0x%x, got 0x%x", tpmutil.RSAEKHandle, handle.Handle())
+	if handle.Handle() != tpmutil.ECCEKHandle {
+		t.Errorf("Expected default handle 0x%x, got 0x%x", tpmutil.ECCEKHandle, handle.Handle())
 	}
 
-	// Verify it's an RSA key
+	// Verify it's an ECC key
 	readPub := tpm2.ReadPublic{
 		ObjectHandle: handle.Handle(),
 	}
@@ -273,7 +267,7 @@ func TestGetEKHandle_DefaultConfig(t *testing.T) {
 		t.Fatalf("Contents failed: %v", err)
 	}
 
-	if pub.Type != tpm2.TPMAlgRSA {
-		t.Errorf("Expected RSA key type, got %v", pub.Type)
+	if pub.Type != tpm2.TPMAlgECC {
+		t.Errorf("Expected ECC key type, got %v", pub.Type)
 	}
 }
