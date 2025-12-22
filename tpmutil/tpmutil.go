@@ -11,6 +11,7 @@ import (
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 	tpmkit "github.com/loicsikidi/go-tpm-kit"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils"
 	"github.com/loicsikidi/go-tpm-kit/tpmcrypto"
 )
 
@@ -47,10 +48,8 @@ const maxBufferSize = tpmkit.MaxBufferSize
 //	fmt.Printf("Read %d bytes from NV index\n", len(data))
 //
 // Note: If cfg is nil, default configuration is used.
-func NVRead(t transport.TPM, cfg *NVReadConfig) ([]byte, error) {
-	if cfg == nil {
-		cfg = &NVReadConfig{}
-	}
+func NVRead(t transport.TPM, optionalCfg ...NVReadConfig) ([]byte, error) {
+	cfg, _ := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
 	}
@@ -116,10 +115,8 @@ func nvRead(t transport.TPM, hierarchy, index tpm2.TPMHandle, auth tpm2.Session,
 //	}
 //
 // Note: If cfg is nil, default configuration is used.
-func NVWrite(t transport.TPM, cfg *NVWriteConfig) error {
-	if cfg == nil {
-		cfg = &NVWriteConfig{}
-	}
+func NVWrite(t transport.TPM, optionalCfg ...NVWriteConfig) error {
+	cfg, _ := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return err
 	}
@@ -214,10 +211,8 @@ type HashResult struct {
 //		log.Fatal(err)
 //	}
 //	fmt.Printf("Digest: %x\n", result.Digest)
-func Hash(t transport.TPM, cfg *HashConfig) (*HashResult, error) {
-	if cfg == nil {
-		cfg = &HashConfig{}
-	}
+func Hash(t transport.TPM, optionalCfg ...HashConfig) (*HashResult, error) {
+	cfg, _ := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
 	}
@@ -314,10 +309,8 @@ func hash(t transport.TPM, hierarchy tpm2.TPMHandle, password string, blockSize 
 //		log.Fatal(err)
 //	}
 //	fmt.Printf("Signature: %x\n", signature)
-func Sign(t transport.TPM, cfg *SignConfig) ([]byte, error) {
-	if cfg == nil {
-		cfg = &SignConfig{}
-	}
+func Sign(t transport.TPM, optionalCfg ...SignConfig) ([]byte, error) {
+	cfg, _ := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
 	}
@@ -401,10 +394,8 @@ func formatRSASignature(sig tpm2.TPMTSignature, alg tpm2.TPMAlgID) ([]byte, erro
 //	fmt.Printf("SRK handle: 0x%x\n", srkHandle.Handle())
 //
 // Note: If cfg is nil, default configuration is used.
-func GetSKRHandle(t transport.TPM, cfg *ParentConfig) (Handle, error) {
-	if cfg == nil {
-		cfg = &ParentConfig{}
-	}
+func GetSKRHandle(t transport.TPM, optionalCfg ...ParentConfig) (Handle, error) {
+	cfg, _ := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
 	}
@@ -430,7 +421,7 @@ func GetSKRHandle(t transport.TPM, cfg *ParentConfig) (Handle, error) {
 		return nil, fmt.Errorf("unsupported SRK KeyType: %v", cfg.KeyFamily)
 	}
 
-	srkHandle, err := CreatePrimary(t, &CreatePrimaryConfig{
+	srkHandle, err := CreatePrimary(t, CreatePrimaryConfig{
 		Template:      srkTemplate,
 		PrimaryHandle: cfg.Hierarchy,
 		Auth:          cfg.Auth,
@@ -479,10 +470,8 @@ func GetSKRHandle(t transport.TPM, cfg *ParentConfig) (Handle, error) {
 //	fmt.Printf("EK handle: 0x%x\n", ekHandle.Handle())
 //
 // Note: If cfg is nil, default configuration is used (RSA EK at handle 0x81010001).
-func GetEKHandle(t transport.TPM, cfg *EKParentConfig) (Handle, error) {
-	if cfg == nil {
-		cfg = &EKParentConfig{}
-	}
+func GetEKHandle(t transport.TPM, optionalCfg ...EKParentConfig) (Handle, error) {
+	cfg, _ := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
 	}
@@ -550,10 +539,8 @@ func getEKTemplate(keyType KeyType, isLowRange bool) (tpm2.TPMTPublic, error) {
 //	fmt.Printf("Persisted EK at handle: 0x%x\n", ekHandle.Handle())
 //
 // Note: If cfg is nil, default configuration is used.
-func PersistEK(t transport.TPM, cfg *EKParentConfig) (Handle, error) {
-	if cfg == nil {
-		cfg = &EKParentConfig{}
-	}
+func PersistEK(t transport.TPM, optionalCfg ...EKParentConfig) (Handle, error) {
+	cfg, _ := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
 	}
@@ -589,7 +576,7 @@ func PersistEK(t transport.TPM, cfg *EKParentConfig) (Handle, error) {
 			return nil, err
 		}
 
-		ekHandle, err := CreatePrimary(t, &CreatePrimaryConfig{
+		ekHandle, err := CreatePrimary(t, CreatePrimaryConfig{
 			PrimaryHandle: tpm2.TPMRHEndorsement,
 			Template:      template,
 			Auth:          cfg.Auth,
@@ -647,10 +634,8 @@ func PersistEK(t transport.TPM, cfg *EKParentConfig) (Handle, error) {
 //	defer primaryHandle.Close()
 //
 // Note: If cfg is nil, default configuration is used.
-func CreatePrimary(t transport.TPM, cfg *CreatePrimaryConfig) (HandleCloser, error) {
-	if cfg == nil {
-		cfg = &CreatePrimaryConfig{}
-	}
+func CreatePrimary(t transport.TPM, optionalCfg ...CreatePrimaryConfig) (HandleCloser, error) {
+	cfg, _ := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
 	}
@@ -698,10 +683,8 @@ func CreatePrimary(t transport.TPM, cfg *CreatePrimaryConfig) (HandleCloser, err
 //	defer closer()
 //
 // Note: If cfg is nil, default configuration is used.
-func CreatePrimaryWithResponse(t transport.TPM, cfg *CreatePrimaryConfig) (*tpm2.CreatePrimaryResponse, func() error, error) {
-	if cfg == nil {
-		cfg = &CreatePrimaryConfig{}
-	}
+func CreatePrimaryWithResponse(t transport.TPM, optionalCfg ...CreatePrimaryConfig) (*tpm2.CreatePrimaryResponse, func() error, error) {
+	cfg, _ := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, nil, err
 	}
@@ -742,10 +725,8 @@ func CreatePrimaryWithResponse(t transport.TPM, cfg *CreatePrimaryConfig) (*tpm2
 //	defer keyHandle.Close()
 //
 // Note: If cfg is nil, default configuration is used.
-func Load(t transport.TPM, cfg *LoadConfig) (HandleCloser, error) {
-	if cfg == nil {
-		cfg = &LoadConfig{}
-	}
+func Load(t transport.TPM, optionalCfg ...LoadConfig) (HandleCloser, error) {
+	cfg, _ := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
 	}

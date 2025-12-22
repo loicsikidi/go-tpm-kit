@@ -17,7 +17,7 @@ func TestCreatePrimaryWithConfig(t *testing.T) {
 
 	t.Run("with ECC template", func(t *testing.T) {
 		eccTemplate := tpm2.ECCSRKTemplate
-		handle, err := tpmutil.CreatePrimary(thetpm, &tpmutil.CreatePrimaryConfig{
+		handle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 			PrimaryHandle: tpm2.TPMRHOwner,
 			Template:      eccTemplate,
 		})
@@ -54,7 +54,7 @@ func TestCreatePrimaryWithConfig(t *testing.T) {
 
 	t.Run("with RSA template", func(t *testing.T) {
 		rsaTemplate := tpm2.RSASRKTemplate
-		handle, err := tpmutil.CreatePrimary(thetpm, &tpmutil.CreatePrimaryConfig{
+		handle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 			PrimaryHandle: tpm2.TPMRHOwner,
 			Template:      rsaTemplate,
 		})
@@ -92,7 +92,7 @@ func TestCreatePrimaryWithResponseAndConfig(t *testing.T) {
 
 	t.Run("with ECC template", func(t *testing.T) {
 		eccTemplate := tpm2.ECCSRKTemplate
-		rsp, closer, err := tpmutil.CreatePrimaryWithResponse(thetpm, &tpmutil.CreatePrimaryConfig{
+		rsp, closer, err := tpmutil.CreatePrimaryWithResponse(thetpm, tpmutil.CreatePrimaryConfig{
 			PrimaryHandle: tpm2.TPMRHOwner,
 			Template:      eccTemplate,
 		})
@@ -121,7 +121,7 @@ func TestCreatePrimaryWithResponseAndConfig(t *testing.T) {
 
 	t.Run("with RSA template", func(t *testing.T) {
 		rsaTemplate := tpm2.RSASRKTemplate
-		rsp, closer, err := tpmutil.CreatePrimaryWithResponse(thetpm, &tpmutil.CreatePrimaryConfig{
+		rsp, closer, err := tpmutil.CreatePrimaryWithResponse(thetpm, tpmutil.CreatePrimaryConfig{
 			PrimaryHandle: tpm2.TPMRHOwner,
 			Template:      rsaTemplate,
 		})
@@ -148,7 +148,7 @@ func TestCreatePrimaryWithResponseAndConfig(t *testing.T) {
 func TestCreatePrimaryConfig_CheckAndSetDefault(t *testing.T) {
 	t.Run("all defaults", func(t *testing.T) {
 		eccTemplate := tpm2.ECCSRKTemplate
-		cfg := &tpmutil.CreatePrimaryConfig{
+		cfg := tpmutil.CreatePrimaryConfig{
 			Template: eccTemplate,
 		}
 
@@ -168,7 +168,7 @@ func TestCreatePrimaryConfig_CheckAndSetDefault(t *testing.T) {
 
 	t.Run("custom values preserved", func(t *testing.T) {
 		eccTemplate := tpm2.ECCSRKTemplate
-		cfg := &tpmutil.CreatePrimaryConfig{
+		cfg := tpmutil.CreatePrimaryConfig{
 			PrimaryHandle: tpm2.TPMRHEndorsement,
 			Template:      eccTemplate,
 		}
@@ -194,7 +194,7 @@ func TestLoadWithConfig(t *testing.T) {
 	t.Run("load child key", func(t *testing.T) {
 		// First create a primary key
 		eccTemplate := tpm2.ECCSRKTemplate
-		primaryHandle, err := tpmutil.CreatePrimary(thetpm, &tpmutil.CreatePrimaryConfig{
+		primaryHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 			PrimaryHandle: tpm2.TPMRHOwner,
 			Template:      eccTemplate,
 		})
@@ -218,7 +218,7 @@ func TestLoadWithConfig(t *testing.T) {
 		}
 
 		// Load the child key using the new Load function
-		childHandle, err := tpmutil.Load(thetpm, &tpmutil.LoadConfig{
+		childHandle, err := tpmutil.Load(thetpm, tpmutil.LoadConfig{
 			ParentHandle: primaryHandle,
 			InPrivate:    createRsp.OutPrivate,
 			InPublic:     createRsp.OutPublic,
@@ -247,7 +247,7 @@ func TestLoadWithConfig(t *testing.T) {
 	})
 
 	t.Run("missing parent handle", func(t *testing.T) {
-		_, err := tpmutil.Load(thetpm, &tpmutil.LoadConfig{
+		_, err := tpmutil.Load(thetpm, tpmutil.LoadConfig{
 			InPrivate: tpm2.TPM2BPrivate{Buffer: []byte("dummy")},
 			InPublic:  tpm2.TPM2BPublic{},
 		})
@@ -258,7 +258,7 @@ func TestLoadWithConfig(t *testing.T) {
 
 	t.Run("missing InPrivate", func(t *testing.T) {
 		eccTemplate := tpm2.ECCSRKTemplate
-		primaryHandle, err := tpmutil.CreatePrimary(thetpm, &tpmutil.CreatePrimaryConfig{
+		primaryHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 			Template: eccTemplate,
 		})
 		if err != nil {
@@ -266,7 +266,7 @@ func TestLoadWithConfig(t *testing.T) {
 		}
 		defer primaryHandle.Close()
 
-		_, err = tpmutil.Load(thetpm, &tpmutil.LoadConfig{
+		_, err = tpmutil.Load(thetpm, tpmutil.LoadConfig{
 			ParentHandle: primaryHandle,
 			InPublic:     tpm2.TPM2BPublic{},
 		})
@@ -283,7 +283,7 @@ func TestLoadConfig_CheckAndSetDefault(t *testing.T) {
 			Name:   tpm2.TPM2BName{Buffer: []byte("test")},
 		})
 
-		cfg := &tpmutil.LoadConfig{
+		cfg := tpmutil.LoadConfig{
 			ParentHandle: handle,
 			InPrivate:    tpm2.TPM2BPrivate{Buffer: []byte("private")},
 			InPublic:     tpm2.TPM2BPublic{},
@@ -300,7 +300,7 @@ func TestLoadConfig_CheckAndSetDefault(t *testing.T) {
 	})
 
 	t.Run("missing parent handle", func(t *testing.T) {
-		cfg := &tpmutil.LoadConfig{
+		cfg := tpmutil.LoadConfig{
 			InPrivate: tpm2.TPM2BPrivate{Buffer: []byte("private")},
 			InPublic:  tpm2.TPM2BPublic{},
 		}
@@ -317,7 +317,7 @@ func TestLoadConfig_CheckAndSetDefault(t *testing.T) {
 			Name:   tpm2.TPM2BName{Buffer: []byte("test")},
 		})
 
-		cfg := &tpmutil.LoadConfig{
+		cfg := tpmutil.LoadConfig{
 			ParentHandle: handle,
 			InPublic:     tpm2.TPM2BPublic{},
 		}

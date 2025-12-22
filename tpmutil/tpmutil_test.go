@@ -50,7 +50,7 @@ func TestNVWrite(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			data := genRandomBytes(tt.payloadSize)
 
-			cfg := &tpmutil.NVWriteConfig{
+			cfg := tpmutil.NVWriteConfig{
 				Index: index,
 				Data:  data,
 			}
@@ -61,7 +61,7 @@ func TestNVWrite(t *testing.T) {
 			}
 
 			if got == nil {
-				readCfg := &tpmutil.NVReadConfig{
+				readCfg := tpmutil.NVReadConfig{
 					Index: index,
 				}
 				gotData, err := tpmutil.NVRead(thetpm, readCfg)
@@ -110,7 +110,7 @@ func TestHashDefault(t *testing.T) {
 		rand.Read(data)
 		wantDigest := sha256.Sum256(data)
 
-		cfg := &tpmutil.HashConfig{
+		cfg := tpmutil.HashConfig{
 			Hierarchy: hierarchy,
 			BlockSize: bufferSize,
 			HashAlg:   crypto.SHA256,
@@ -158,7 +158,7 @@ func TestTPMHashMsgTooShort(t *testing.T) {
 	for _, size := range sizes {
 		t.Run(fmt.Sprintf("size=%d", size), func(t *testing.T) {
 			msg := make([]byte, size)
-			cfg := &tpmutil.HashConfig{Data: msg}
+			cfg := tpmutil.HashConfig{Data: msg}
 			result, err := tpmutil.Hash(thetpm, cfg)
 			if err == nil {
 				t.Errorf("Hash() succeeded, want error")
@@ -193,7 +193,7 @@ func TestTPMHash(t *testing.T) {
 			msg := make([]byte, size)
 			rand.Read(msg)
 
-			cfg := &tpmutil.HashConfig{Data: msg}
+			cfg := tpmutil.HashConfig{Data: msg}
 			result, err := tpmutil.Hash(thetpm, cfg)
 			if err != nil {
 				t.Fatalf("Hash() failed: %v", err)
@@ -222,7 +222,7 @@ func TestHash(t *testing.T) {
 	defer thetpm.Close()
 
 	data := []byte("hello world")
-	cfg := &tpmutil.HashConfig{
+	cfg := tpmutil.HashConfig{
 		Hierarchy: tpm2.TPMRHOwner,
 		Password:  "",
 		BlockSize: 1024,
@@ -252,7 +252,7 @@ func TestHashWithCustomConfig(t *testing.T) {
 	}
 	defer thetpm.Close()
 
-	cfg := &tpmutil.HashConfig{
+	cfg := tpmutil.HashConfig{
 		Hierarchy: tpm2.TPMRHOwner,
 		Password:  "custom-password",
 		BlockSize: 512,
@@ -336,7 +336,7 @@ func TestSign(t *testing.T) {
 	}
 
 	// Hash some data (required for signing)
-	hashCfg := &tpmutil.HashConfig{Data: []byte("sign this message")}
+	hashCfg := tpmutil.HashConfig{Data: []byte("sign this message")}
 	result, err := tpmutil.Hash(thetpm, hashCfg)
 	if err != nil {
 		t.Fatalf("Hash() failed: %v", err)
@@ -351,7 +351,7 @@ func TestSign(t *testing.T) {
 		Name:   rsp.Name,
 	})
 
-	cfg := &tpmutil.SignConfig{
+	cfg := tpmutil.SignConfig{
 		KeyHandle:  handle,
 		Digest:     result.Digest,
 		PublicKey:  pubKey,
@@ -380,7 +380,7 @@ func TestNVRead(t *testing.T) {
 	data := []byte("test data")
 
 	// Write data first with nil config (uses defaults)
-	writeCfg := &tpmutil.NVWriteConfig{
+	writeCfg := tpmutil.NVWriteConfig{
 		Index: index,
 		Data:  data,
 	}
@@ -405,7 +405,7 @@ func TestNVRead(t *testing.T) {
 	}()
 
 	// Read the data back with nil config (uses defaults)
-	readCfg := &tpmutil.NVReadConfig{
+	readCfg := tpmutil.NVReadConfig{
 		Index: index,
 	}
 	readData, err := tpmutil.NVRead(thetpm, readCfg)

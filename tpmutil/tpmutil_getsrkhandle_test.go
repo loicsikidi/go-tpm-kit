@@ -16,7 +16,7 @@ func TestGetSKRHandle_CreateNew_RSA(t *testing.T) {
 	}
 	defer thetpm.Close()
 
-	cfg := &tpmutil.ParentConfig{
+	cfg := tpmutil.ParentConfig{
 		KeyFamily: tpmutil.RSA,
 	}
 	srkHandle, err := tpmutil.GetSKRHandle(thetpm, cfg)
@@ -54,7 +54,7 @@ func TestGetSKRHandle_CreateNew_ECC(t *testing.T) {
 	}
 	defer thetpm.Close()
 
-	cfg := &tpmutil.ParentConfig{
+	cfg := tpmutil.ParentConfig{
 		KeyFamily: tpmutil.ECC,
 	}
 	srkHandle, err := tpmutil.GetSKRHandle(thetpm, cfg)
@@ -93,7 +93,7 @@ func TestGetSKRHandle_AlreadyPersisted_SKR(t *testing.T) {
 	defer thetpm.Close()
 
 	// First, create and persist an RSA SRK
-	cfg := &tpmutil.ParentConfig{
+	cfg := tpmutil.ParentConfig{
 		KeyFamily: tpmutil.RSA,
 	}
 	_, err = tpmutil.GetSKRHandle(thetpm, cfg)
@@ -102,7 +102,7 @@ func TestGetSKRHandle_AlreadyPersisted_SKR(t *testing.T) {
 	}
 
 	// Now call GetSKRHandle but with ECC kty - it should find the existing SRK
-	cfg2 := &tpmutil.ParentConfig{
+	cfg2 := tpmutil.ParentConfig{
 		KeyFamily: tpmutil.ECC,
 	}
 	srkHandle, err := tpmutil.GetSKRHandle(thetpm, cfg2)
@@ -157,7 +157,7 @@ func TestGetSKRHandle_CustomOwnerPassword(t *testing.T) {
 	}
 
 	// Try to get SRK with the custom password
-	cfg := &tpmutil.ParentConfig{
+	cfg := tpmutil.ParentConfig{
 		KeyFamily: tpmutil.ECC,
 		Auth:      tpm2.PasswordAuth(ownerPassword),
 	}
@@ -181,7 +181,7 @@ func TestGetSKRHandle_NonStandardHandle(t *testing.T) {
 	// Use a non-standard persistent handle
 	customHandle := tpm2.TPMHandle(0x81000010)
 
-	cfg := &tpmutil.ParentConfig{
+	cfg := tpmutil.ParentConfig{
 		KeyFamily: tpmutil.ECC,
 		Handle:    tpmutil.NewHandle(customHandle),
 	}

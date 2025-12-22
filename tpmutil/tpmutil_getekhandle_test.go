@@ -35,7 +35,7 @@ func TestGetEKHandle_NotFound(t *testing.T) {
 			}
 			defer thetpm.Close()
 
-			cfg := &tpmutil.EKParentConfig{
+			cfg := tpmutil.EKParentConfig{
 				ParentConfig: tpmutil.ParentConfig{
 					KeyFamily: tt.keyFamily,
 				},
@@ -90,7 +90,7 @@ func TestGetEKHandle_AlreadyPersisted(t *testing.T) {
 			defer thetpm.Close()
 
 			// Create and persist an EK manually
-			ekHandle, err := tpmutil.CreatePrimary(thetpm, &tpmutil.CreatePrimaryConfig{
+			ekHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 				PrimaryHandle: tpm2.TPMRHEndorsement,
 				Auth:          tpmutil.NoAuth,
 				Template:      tt.template,
@@ -114,7 +114,7 @@ func TestGetEKHandle_AlreadyPersisted(t *testing.T) {
 			}
 
 			// Now try to get the EK
-			cfg := &tpmutil.EKParentConfig{
+			cfg := tpmutil.EKParentConfig{
 				ParentConfig: tpmutil.ParentConfig{
 					KeyFamily: tt.keyFamily,
 				},
@@ -160,7 +160,7 @@ func TestGetEKHandle_CustomHandle(t *testing.T) {
 	customHandle := tpm2.TPMHandle(0x81010010)
 
 	// Create and persist an RSA EK at custom handle
-	ekHandle, err := tpmutil.CreatePrimary(thetpm, &tpmutil.CreatePrimaryConfig{
+	ekHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHEndorsement,
 		Auth:          tpmutil.NoAuth,
 		Template:      tpmutil.RSAEKTemplate,
@@ -184,7 +184,7 @@ func TestGetEKHandle_CustomHandle(t *testing.T) {
 	}
 
 	// Try to get the EK at the custom handle
-	cfg := &tpmutil.EKParentConfig{
+	cfg := tpmutil.EKParentConfig{
 		ParentConfig: tpmutil.ParentConfig{
 			KeyFamily: tpmutil.RSA,
 			Handle:    tpmutil.NewHandle(customHandle),
@@ -226,7 +226,7 @@ func TestGetEKHandle_DefaultConfig(t *testing.T) {
 	defer thetpm.Close()
 
 	// Create and persist an RSA EK at default handle
-	ekHandle, err := tpmutil.CreatePrimary(thetpm, &tpmutil.CreatePrimaryConfig{
+	ekHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHEndorsement,
 		Auth:          tpmutil.NoAuth,
 		Template:      tpmutil.RSAEKTemplate,
@@ -250,7 +250,7 @@ func TestGetEKHandle_DefaultConfig(t *testing.T) {
 	}
 
 	// Call GetEKHandle with nil config (should use defaults: RSA at 0x81010001)
-	handle, err := tpmutil.GetEKHandle(thetpm, nil)
+	handle, err := tpmutil.GetEKHandle(thetpm)
 	if err != nil {
 		t.Fatalf("GetEKHandle with nil config failed: %v", err)
 	}
