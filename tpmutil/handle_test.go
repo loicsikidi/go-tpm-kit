@@ -190,7 +190,7 @@ func TestNewHandleCloser(t *testing.T) {
 
 	createPrimary := tpm2.CreatePrimary{
 		PrimaryHandle: tpm2.TPMRHOwner,
-		InPublic:      tpm2.New2B(tpm2.RSASRKTemplate),
+		InPublic:      tpm2.New2B(tpm2.ECCSRKTemplate),
 	}
 
 	rsp, err := createPrimary.Execute(thetpm)
@@ -281,7 +281,7 @@ func TestAsHandle(t *testing.T) {
 		// Create a primary key to get a valid handle
 		createPrimary := tpm2.CreatePrimary{
 			PrimaryHandle: tpm2.TPMRHOwner,
-			InPublic:      tpm2.New2B(tpm2.RSASRKTemplate),
+			InPublic:      tpm2.New2B(tpm2.ECCSRKTemplate),
 		}
 
 		rsp, err := createPrimary.Execute(thetpm)
@@ -415,6 +415,68 @@ func TestTpmHandleMethods(t *testing.T) {
 					t.Errorf("Type() = %v, want %v", h.Type(), tt.expectedType)
 				}
 			})
+		}
+	})
+
+	t.Run("Public() method - with public", func(t *testing.T) {
+		thetpm, err := simulator.OpenSimulator()
+		if err != nil {
+			t.Fatalf("Failed to open TPM simulator: %v", err)
+		}
+		defer thetpm.Close()
+
+		createPrimary := tpm2.CreatePrimary{
+			PrimaryHandle: tpm2.TPMRHOwner,
+			InPublic:      tpm2.New2B(tpm2.ECCSRKTemplate),
+		}
+
+		rsp, err := createPrimary.Execute(thetpm)
+		if err != nil {
+			t.Fatalf("CreatePrimary() failed: %v", err)
+		}
+		defer func() {
+			tpm2.FlushContext{FlushHandle: rsp.ObjectHandle}.Execute(thetpm)
+		}()
+
+		public, err := rsp.OutPublic.Contents()
+		if err != nil {
+			t.Fatalf("OutPublic.Contents() failed: %v", err)
+		}
+
+		h := &tpmHandle{
+			handle: &tpm2.NamedHandle{Handle: rsp.ObjectHandle, Name: rsp.Name},
+			tpm:    thetpm,
+			isAuth: false,
+			public: public,
+		}
+
+		if !h.HasPublic() {
+			t.Error("HasPublic() = false, want true")
+		}
+
+		gotPublic := h.Public()
+		if gotPublic == nil {
+			t.Fatal("Public() returned nil, want non-nil")
+		}
+
+		if gotPublic.Type != tpm2.TPMAlgECC {
+			t.Errorf("Public().Type = %v, want %v", gotPublic.Type, tpm2.TPMAlgECC)
+		}
+	})
+
+	t.Run("Public() method - without public", func(t *testing.T) {
+		namedHandle := tpm2.NamedHandle{
+			Handle: tpm2.TPMHandle(0x80000001),
+			Name:   tpm2.TPM2BName{Buffer: []byte("test")},
+		}
+		h := NewHandle(&namedHandle)
+
+		if h.HasPublic() {
+			t.Error("HasPublic() = true, want false")
+		}
+
+		if h.Public() != nil {
+			t.Error("Public() returned non-nil, want nil")
 		}
 	})
 }
