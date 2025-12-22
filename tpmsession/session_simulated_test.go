@@ -52,7 +52,7 @@ func setupTPM(t *testing.T) (transport.TPMCloser, func()) {
 func getSRK(t *testing.T, tpm transport.TPM, handle tpm2.TPMHandle) (name, public []byte) {
 	t.Helper()
 
-	h, err := tpmutil.GetSKRHandle(tpm, &tpmutil.ParentConfig{
+	h, err := tpmutil.GetSKRHandle(tpm, tpmutil.ParentConfig{
 		Handle:    tpmutil.NewHandle(handle),
 		KeyFamily: tpmutil.RSA,
 		Hierarchy: tpm2.TPMRHOwner,

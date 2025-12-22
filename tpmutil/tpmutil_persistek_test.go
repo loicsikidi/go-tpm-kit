@@ -77,7 +77,7 @@ func TestPersistEK_CreateNew(t *testing.T) {
 				keyFamily = tpmutil.ECC
 			}
 
-			cfg := &tpmutil.EKParentConfig{
+			cfg := tpmutil.EKParentConfig{
 				ParentConfig: tpmutil.ParentConfig{
 					KeyFamily: keyFamily,
 				},
@@ -123,7 +123,7 @@ func TestPersistEK_WithTransientKey(t *testing.T) {
 	defer thetpm.Close()
 
 	// Create a transient EK manually
-	transientEK, err := tpmutil.CreatePrimary(thetpm, &tpmutil.CreatePrimaryConfig{
+	transientEK, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHEndorsement,
 		Template:      tpmutil.RSAEKTemplate,
 	})
@@ -133,7 +133,7 @@ func TestPersistEK_WithTransientKey(t *testing.T) {
 	defer transientEK.Close()
 
 	// Persist it using PersistEK
-	cfg := &tpmutil.EKParentConfig{
+	cfg := tpmutil.EKParentConfig{
 		ParentConfig: tpmutil.ParentConfig{
 			KeyFamily: tpmutil.RSA,
 		},
@@ -178,7 +178,7 @@ func TestPersistEK_CustomHandle(t *testing.T) {
 
 	customHandle := tpm2.TPMHandle(0x81010020)
 
-	cfg := &tpmutil.EKParentConfig{
+	cfg := tpmutil.EKParentConfig{
 		ParentConfig: tpmutil.ParentConfig{
 			KeyFamily: tpmutil.RSA,
 			Handle:    tpmutil.NewHandle(customHandle),
@@ -224,7 +224,7 @@ func TestPersistEK_HandleAlreadyOccupied(t *testing.T) {
 		defer thetpm.Close()
 
 		// First, persist an EK at the default RSA handle
-		cfg1 := &tpmutil.EKParentConfig{
+		cfg1 := tpmutil.EKParentConfig{
 			ParentConfig: tpmutil.ParentConfig{
 				KeyFamily: tpmutil.RSA,
 			},
@@ -242,7 +242,7 @@ func TestPersistEK_HandleAlreadyOccupied(t *testing.T) {
 		}
 
 		// Now try to persist another EK at the same handle without Force - should fail
-		cfg2 := &tpmutil.EKParentConfig{
+		cfg2 := tpmutil.EKParentConfig{
 			ParentConfig: tpmutil.ParentConfig{
 				KeyFamily: tpmutil.RSA,
 			},
@@ -265,7 +265,7 @@ func TestPersistEK_HandleAlreadyOccupied(t *testing.T) {
 		defer thetpm.Close()
 
 		// First, persist an EK at the default RSA handle (low-range template)
-		cfg1 := &tpmutil.EKParentConfig{
+		cfg1 := tpmutil.EKParentConfig{
 			ParentConfig: tpmutil.ParentConfig{
 				KeyFamily: tpmutil.RSA,
 			},
@@ -296,7 +296,7 @@ func TestPersistEK_HandleAlreadyOccupied(t *testing.T) {
 		}
 
 		// Now persist another EK at the same handle with Force=true (high-range template)
-		cfg2 := &tpmutil.EKParentConfig{
+		cfg2 := tpmutil.EKParentConfig{
 			ParentConfig: tpmutil.ParentConfig{
 				KeyFamily: tpmutil.RSA,
 			},
@@ -351,7 +351,7 @@ func TestPersistEK_MissingKeyType(t *testing.T) {
 	}
 	defer thetpm.Close()
 
-	cfg := &tpmutil.EKParentConfig{
+	cfg := tpmutil.EKParentConfig{
 		ParentConfig: tpmutil.ParentConfig{
 			KeyFamily: tpmutil.RSA,
 		},
@@ -372,7 +372,7 @@ func TestPersistEK_DefaultConfig(t *testing.T) {
 	defer thetpm.Close()
 
 	// Using default config should fail because KeyType is required
-	_, err = tpmutil.PersistEK(thetpm, nil)
+	_, err = tpmutil.PersistEK(thetpm)
 	if err == nil {
 		t.Fatal("Expected error with nil config (KeyType required), got nil")
 	}

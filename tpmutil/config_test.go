@@ -14,17 +14,17 @@ import (
 func TestNVReadConfigValidation(t *testing.T) {
 	tests := []struct {
 		name    string
-		cfg     *tpmutil.NVReadConfig
+		cfg     tpmutil.NVReadConfig
 		wantErr error
 	}{
 		{
 			name:    "missing Index",
-			cfg:     &tpmutil.NVReadConfig{},
+			cfg:     tpmutil.NVReadConfig{},
 			wantErr: tpmutil.ErrMissingIndex,
 		},
 		{
 			name: "negative BlockSize",
-			cfg: &tpmutil.NVReadConfig{
+			cfg: tpmutil.NVReadConfig{
 				Index:     tpm2.TPMHandle(0x01800001),
 				BlockSize: -1,
 			},
@@ -32,7 +32,7 @@ func TestNVReadConfigValidation(t *testing.T) {
 		},
 		{
 			name: "BlockSize exceeds maximum gets capped",
-			cfg: &tpmutil.NVReadConfig{
+			cfg: tpmutil.NVReadConfig{
 				Index:     tpm2.TPMHandle(0x01800001),
 				BlockSize: 2000,
 			},
@@ -40,7 +40,7 @@ func TestNVReadConfigValidation(t *testing.T) {
 		},
 		{
 			name: "zero BlockSize uses default",
-			cfg: &tpmutil.NVReadConfig{
+			cfg: tpmutil.NVReadConfig{
 				Index:     tpm2.TPMHandle(0x01800001),
 				BlockSize: 0,
 			},
@@ -48,7 +48,7 @@ func TestNVReadConfigValidation(t *testing.T) {
 		},
 		{
 			name: "valid custom BlockSize",
-			cfg: &tpmutil.NVReadConfig{
+			cfg: tpmutil.NVReadConfig{
 				Index:     tpm2.TPMHandle(0x01800001),
 				BlockSize: 512,
 			},
@@ -86,22 +86,22 @@ func TestNVReadConfigValidation(t *testing.T) {
 func TestNVWriteConfigValidation(t *testing.T) {
 	tests := []struct {
 		name    string
-		cfg     *tpmutil.NVWriteConfig
+		cfg     tpmutil.NVWriteConfig
 		wantErr error
 	}{
 		{
 			name:    "missing Index",
-			cfg:     &tpmutil.NVWriteConfig{Data: []byte("test")},
+			cfg:     tpmutil.NVWriteConfig{Data: []byte("test")},
 			wantErr: tpmutil.ErrMissingIndex,
 		},
 		{
 			name:    "missing Data",
-			cfg:     &tpmutil.NVWriteConfig{Index: tpm2.TPMHandle(0x01800001)},
+			cfg:     tpmutil.NVWriteConfig{Index: tpm2.TPMHandle(0x01800001)},
 			wantErr: tpmutil.ErrMissingData,
 		},
 		{
 			name: "valid config with defaults",
-			cfg: &tpmutil.NVWriteConfig{
+			cfg: tpmutil.NVWriteConfig{
 				Index: tpm2.TPMHandle(0x01800001),
 				Data:  []byte("test"),
 			},
@@ -139,27 +139,27 @@ func TestNVWriteConfigValidation(t *testing.T) {
 func TestSignConfigValidation(t *testing.T) {
 	tests := []struct {
 		name    string
-		cfg     *tpmutil.SignConfig
+		cfg     tpmutil.SignConfig
 		wantErr error
 	}{
 		{
 			name:    "nil KeyHandle",
-			cfg:     &tpmutil.SignConfig{Digest: []byte("test"), PublicKey: &ecdsa.PublicKey{}},
+			cfg:     tpmutil.SignConfig{Digest: []byte("test"), PublicKey: &ecdsa.PublicKey{}},
 			wantErr: tpmutil.ErrMissingHandle,
 		},
 		{
 			name:    "nil Digest",
-			cfg:     &tpmutil.SignConfig{KeyHandle: tpmutil.NewHandle(&tpm2.NamedHandle{}), PublicKey: &ecdsa.PublicKey{}},
+			cfg:     tpmutil.SignConfig{KeyHandle: tpmutil.NewHandle(&tpm2.NamedHandle{}), PublicKey: &ecdsa.PublicKey{}},
 			wantErr: tpmutil.ErrMissingData,
 		},
 		{
 			name:    "nil PublicKey",
-			cfg:     &tpmutil.SignConfig{KeyHandle: tpmutil.NewHandle(&tpm2.NamedHandle{}), Digest: []byte("test")},
+			cfg:     tpmutil.SignConfig{KeyHandle: tpmutil.NewHandle(&tpm2.NamedHandle{}), Digest: []byte("test")},
 			wantErr: tpmutil.ErrMissingPublicKey,
 		},
 		{
 			name: "nil SignerOpts uses default",
-			cfg: &tpmutil.SignConfig{
+			cfg: tpmutil.SignConfig{
 				KeyHandle: tpmutil.NewHandle(&tpm2.NamedHandle{}),
 				Digest:    []byte("test"),
 				PublicKey: &ecdsa.PublicKey{},
@@ -200,7 +200,7 @@ func TestHashConfigValidation(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		cfg       *tpmutil.HashConfig
+		cfg       []tpmutil.HashConfig
 		wantError error
 	}{
 		{
@@ -210,37 +210,45 @@ func TestHashConfigValidation(t *testing.T) {
 		},
 		{
 			name: "negative blockSize",
-			cfg: &tpmutil.HashConfig{
-				BlockSize: -1,
-				HashAlg:   crypto.SHA256,
-				Data:      data,
+			cfg: []tpmutil.HashConfig{
+				{
+					BlockSize: -1,
+					HashAlg:   crypto.SHA256,
+					Data:      data,
+				},
 			},
 			wantError: tpmutil.ErrInvalidBlockSize,
 		},
 		{
 			name: "blockSize exceeds maximum gets capped",
-			cfg: &tpmutil.HashConfig{
-				BlockSize: 2048,
-				HashAlg:   crypto.SHA256,
-				Data:      data,
+			cfg: []tpmutil.HashConfig{
+				{
+					BlockSize: 2048,
+					HashAlg:   crypto.SHA256,
+					Data:      data,
+				},
 			},
 			wantError: nil,
 		},
 		{
 			name: "zero blockSize uses default",
-			cfg: &tpmutil.HashConfig{
-				BlockSize: 0,
-				HashAlg:   crypto.SHA256,
-				Data:      data,
+			cfg: []tpmutil.HashConfig{
+				{
+					BlockSize: 0,
+					HashAlg:   crypto.SHA256,
+					Data:      data,
+				},
 			},
 			wantError: nil,
 		},
 		{
 			name: "valid custom blockSize",
-			cfg: &tpmutil.HashConfig{
-				BlockSize: 512,
-				HashAlg:   crypto.SHA256,
-				Data:      data,
+			cfg: []tpmutil.HashConfig{
+				{
+					BlockSize: 512,
+					HashAlg:   crypto.SHA256,
+					Data:      data,
+				},
 			},
 			wantError: nil,
 		},
@@ -248,7 +256,7 @@ func TestHashConfigValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := tpmutil.Hash(thetpm, tt.cfg)
+			result, err := tpmutil.Hash(thetpm, tt.cfg...)
 			if tt.wantError != nil {
 				if err == nil {
 					t.Errorf("Expected error %v, got nil", tt.wantError)
