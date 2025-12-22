@@ -430,14 +430,11 @@ func GetSKRHandle(t transport.TPM, cfg *ParentConfig) (Handle, error) {
 		return nil, fmt.Errorf("unsupported SRK KeyType: %v", cfg.KeyFamily)
 	}
 
-	srkCreateCmd := tpm2.CreatePrimary{
-		PrimaryHandle: tpm2.AuthHandle{
-			Handle: cfg.Hierarchy,
-			Auth:   cfg.Auth, // owner auth
-		},
-		InPublic: tpm2.New2B(srkTemplate),
-	}
-	srkHandle, err := CreatePrimary(t, srkCreateCmd)
+	srkHandle, err := CreatePrimary(t, &CreatePrimaryConfig{
+		Template:      srkTemplate,
+		PrimaryHandle: cfg.Hierarchy,
+		Auth:          cfg.Auth,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("ReadPublic failed (%v), and then CreatePrimary failed: %v", rerr, err)
 	}
@@ -592,15 +589,11 @@ func PersistEK(t transport.TPM, cfg *EKParentConfig) (Handle, error) {
 			return nil, err
 		}
 
-		createCmd := tpm2.CreatePrimary{
-			PrimaryHandle: tpm2.AuthHandle{
-				Handle: cfg.Hierarchy,
-				Auth:   cfg.Auth,
-			},
-			InPublic: tpm2.New2B(template),
-		}
-
-		ekHandle, err := CreatePrimary(t, createCmd)
+		ekHandle, err := CreatePrimary(t, &CreatePrimaryConfig{
+			PrimaryHandle: tpm2.TPMRHEndorsement,
+			Template:      template,
+			Auth:          cfg.Auth,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("CreatePrimary failed: %w", err)
 		}
@@ -636,4 +629,152 @@ func PersistEK(t transport.TPM, cfg *EKParentConfig) (Handle, error) {
 	})
 
 	return persistedHandle, nil
+}
+
+// CreatePrimary creates a primary key in the TPM and returns a [HandleCloser].
+//
+// Example:
+//
+//	// Create an ECC primary key in the owner hierarchy
+//	eccTemplate := tpm2.ECCSRKTemplate
+//	primaryHandle, err := tpmutil.CreatePrimary(tpm, &tpmutil.CreatePrimaryConfig{
+//		PrimaryHandle: tpm2.TPMRHOwner,
+//		Template:      &eccTemplate,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer primaryHandle.Close()
+//
+// Note: If cfg is nil, default configuration is used.
+func CreatePrimary(t transport.TPM, cfg *CreatePrimaryConfig) (HandleCloser, error) {
+	if cfg == nil {
+		cfg = &CreatePrimaryConfig{}
+	}
+	if err := cfg.CheckAndSetDefault(); err != nil {
+		return nil, err
+	}
+
+	cmd := tpm2.CreatePrimary{
+		PrimaryHandle: tpm2.AuthHandle{
+			Handle: cfg.PrimaryHandle,
+			Auth:   cfg.Auth,
+		},
+		InPublic: tpm2.New2B(cfg.Template),
+	}
+
+	rsp, err := cmd.Execute(t)
+	if err != nil {
+		return nil, err
+	}
+
+	public, err := rsp.OutPublic.Contents()
+	if err != nil {
+		return nil, err
+	}
+
+	h := &tpm2.NamedHandle{Handle: rsp.ObjectHandle, Name: rsp.Name}
+	hc := &tpmHandle{
+		handle: h,
+		tpm:    t,
+		public: public,
+	}
+	return hc, nil
+}
+
+// CreatePrimaryWithResponse creates a primary key in the TPM and returns the response along with a closer function.
+//
+// Example:
+//
+//	// Create an RSA primary key and get the full response
+//	rsaTemplate := tpm2.RSASRKTemplate
+//	createPrimaryRsp, closer, err := tpmutil.CreatePrimaryWithResponse(tpm, &tpmutil.CreatePrimaryConfig{
+//		PrimaryHandle: tpm2.TPMRHOwner,
+//		Template:      &rsaTemplate,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer closer()
+//
+// Note: If cfg is nil, default configuration is used.
+func CreatePrimaryWithResponse(t transport.TPM, cfg *CreatePrimaryConfig) (*tpm2.CreatePrimaryResponse, func() error, error) {
+	if cfg == nil {
+		cfg = &CreatePrimaryConfig{}
+	}
+	if err := cfg.CheckAndSetDefault(); err != nil {
+		return nil, nil, err
+	}
+
+	cmd := tpm2.CreatePrimary{
+		PrimaryHandle: tpm2.AuthHandle{
+			Handle: cfg.PrimaryHandle,
+			Auth:   cfg.Auth,
+		},
+		InPublic: tpm2.New2B(cfg.Template),
+	}
+
+	rsp, err := cmd.Execute(t)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	closer := func() error {
+		_, err := (&tpm2.FlushContext{FlushHandle: rsp.ObjectHandle}).Execute(t)
+		return err
+	}
+	return rsp, closer, nil
+}
+
+// Load loads a key into the TPM and returns a [HandleCloser].
+//
+// Example:
+//
+//	// Load a previously created key into the TPM
+//	keyHandle, err := tpmutil.Load(tpm, &tpmutil.LoadConfig{
+//		ParentHandle: srkHandle,
+//		InPrivate:    createRsp.OutPrivate,
+//		InPublic:     createRsp.OutPublic,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer keyHandle.Close()
+//
+// Note: If cfg is nil, default configuration is used.
+func Load(t transport.TPM, cfg *LoadConfig) (HandleCloser, error) {
+	if cfg == nil {
+		cfg = &LoadConfig{}
+	}
+	if err := cfg.CheckAndSetDefault(); err != nil {
+		return nil, err
+	}
+
+	cmd := tpm2.Load{
+		ParentHandle: tpm2.AuthHandle{
+			Handle: cfg.ParentHandle.Handle(),
+			Name:   cfg.ParentHandle.Name(),
+			Auth:   cfg.Auth,
+		},
+		InPrivate: cfg.InPrivate,
+		InPublic:  cfg.InPublic,
+	}
+
+	rsp, err := cmd.Execute(t)
+	if err != nil {
+		return nil, err
+	}
+
+	public, err := cfg.InPublic.Contents()
+	if err != nil {
+		return nil, err
+	}
+
+	h := &tpm2.NamedHandle{Handle: rsp.ObjectHandle, Name: rsp.Name}
+	hc := &tpmHandle{
+		handle: h,
+		tpm:    t,
+		public: public,
+	}
+	return hc, nil
 }

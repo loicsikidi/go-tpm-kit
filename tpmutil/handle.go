@@ -72,6 +72,11 @@ type Handle interface {
 	IsAuth() bool
 	// Type returns the type of the handle.
 	Type() HandleType
+	// Public returns the public area associated with the handle.
+	// Returns nil if no public area is available.
+	Public() *tpm2.TPMTPublic
+	// HasPublic indicates if the handle has an associated public area.
+	HasPublic() bool
 }
 
 // HandleCloser extends Handle with the ability to release resources.
@@ -87,6 +92,7 @@ type tpmHandle struct {
 	handle
 	tpm    transport.TPM
 	isAuth bool
+	public *tpm2.TPMTPublic
 }
 
 // NewHandle creates a new Handle from the given TPM handle.
@@ -143,6 +149,16 @@ func (h *tpmHandle) IsAuth() bool {
 // Type returns the type of the handle.
 func (h *tpmHandle) Type() HandleType {
 	return identifyHandleType(h)
+}
+
+// Public returns the public area associated with the handle.
+func (h *tpmHandle) Public() *tpm2.TPMTPublic {
+	return h.public
+}
+
+// HasPublic indicates if the handle has an associated public area.
+func (h *tpmHandle) HasPublic() bool {
+	return h.public != nil
 }
 
 // Close flushes the handle from the TPM.

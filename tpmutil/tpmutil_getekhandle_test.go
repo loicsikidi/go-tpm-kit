@@ -90,14 +90,11 @@ func TestGetEKHandle_AlreadyPersisted(t *testing.T) {
 			defer thetpm.Close()
 
 			// Create and persist an EK manually
-			createCmd := tpm2.CreatePrimary{
-				PrimaryHandle: tpm2.AuthHandle{
-					Handle: tpm2.TPMRHEndorsement,
-					Auth:   tpmutil.NoAuth,
-				},
-				InPublic: tpm2.New2B(tt.template),
-			}
-			ekHandle, err := tpmutil.CreatePrimary(thetpm, createCmd)
+			ekHandle, err := tpmutil.CreatePrimary(thetpm, &tpmutil.CreatePrimaryConfig{
+				PrimaryHandle: tpm2.TPMRHEndorsement,
+				Auth:          tpmutil.NoAuth,
+				Template:      tt.template,
+			})
 			if err != nil {
 				t.Fatalf("CreatePrimary failed: %v", err)
 			}
@@ -163,14 +160,11 @@ func TestGetEKHandle_CustomHandle(t *testing.T) {
 	customHandle := tpm2.TPMHandle(0x81010010)
 
 	// Create and persist an RSA EK at custom handle
-	createCmd := tpm2.CreatePrimary{
-		PrimaryHandle: tpm2.AuthHandle{
-			Handle: tpm2.TPMRHEndorsement,
-			Auth:   tpmutil.NoAuth,
-		},
-		InPublic: tpm2.New2B(tpmutil.RSAEKTemplate),
-	}
-	ekHandle, err := tpmutil.CreatePrimary(thetpm, createCmd)
+	ekHandle, err := tpmutil.CreatePrimary(thetpm, &tpmutil.CreatePrimaryConfig{
+		PrimaryHandle: tpm2.TPMRHEndorsement,
+		Auth:          tpmutil.NoAuth,
+		Template:      tpmutil.RSAEKTemplate,
+	})
 	if err != nil {
 		t.Fatalf("CreatePrimary failed: %v", err)
 	}
@@ -232,14 +226,11 @@ func TestGetEKHandle_DefaultConfig(t *testing.T) {
 	defer thetpm.Close()
 
 	// Create and persist an RSA EK at default handle
-	createCmd := tpm2.CreatePrimary{
-		PrimaryHandle: tpm2.AuthHandle{
-			Handle: tpm2.TPMRHEndorsement,
-			Auth:   tpmutil.NoAuth,
-		},
-		InPublic: tpm2.New2B(tpmutil.RSAEKTemplate),
-	}
-	ekHandle, err := tpmutil.CreatePrimary(thetpm, createCmd)
+	ekHandle, err := tpmutil.CreatePrimary(thetpm, &tpmutil.CreatePrimaryConfig{
+		PrimaryHandle: tpm2.TPMRHEndorsement,
+		Auth:          tpmutil.NoAuth,
+		Template:      tpmutil.RSAEKTemplate,
+	})
 	if err != nil {
 		t.Fatalf("CreatePrimary failed: %v", err)
 	}

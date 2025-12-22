@@ -256,3 +256,64 @@ func (c *EKParentConfig) CheckAndSetDefault() error {
 	}
 	return nil
 }
+
+// CreatePrimaryConfig holds configuration for TPM CreatePrimary operations.
+type CreatePrimaryConfig struct {
+	// Template specifies the key template to use.
+	//
+	// Required.
+	Template tpm2.TPMTPublic
+	// PrimaryHandle specifies which hierarchy to create the primary key under.
+	//
+	// Default: [tpm2.TPMRHOwner].
+	PrimaryHandle tpm2.TPMHandle
+	// Auth is the authorization session for the hierarchy.
+	//
+	// Default: [NoAuth].
+	Auth tpm2.Session
+}
+
+// CheckAndSetDefault validates and sets default values for CreatePrimaryConfig.
+func (c *CreatePrimaryConfig) CheckAndSetDefault() error {
+	if c.PrimaryHandle == 0 {
+		c.PrimaryHandle = tpm2.TPMRHOwner
+	}
+	if c.Auth == nil {
+		c.Auth = NoAuth
+	}
+	return nil
+}
+
+// LoadConfig holds configuration for TPM Load operations.
+type LoadConfig struct {
+	// ParentHandle is the handle of the parent key.
+	//
+	// Required.
+	ParentHandle Handle
+	// InPrivate is the encrypted private portion of the object.
+	//
+	// Required.
+	InPrivate tpm2.TPM2BPrivate
+	// InPublic is the public portion of the object.
+	//
+	// Required.
+	InPublic tpm2.TPM2BPublic
+	// Auth is the authorization session for the parent key.
+	//
+	// Default: [NoAuth].
+	Auth tpm2.Session
+}
+
+// CheckAndSetDefault validates and sets default values for LoadConfig.
+func (c *LoadConfig) CheckAndSetDefault() error {
+	if c.ParentHandle == nil {
+		return ErrMissingHandle
+	}
+	if len(c.InPrivate.Buffer) == 0 {
+		return fmt.Errorf("InPrivate is required")
+	}
+	if c.Auth == nil {
+		c.Auth = NoAuth
+	}
+	return nil
+}

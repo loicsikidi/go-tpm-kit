@@ -123,14 +123,10 @@ func TestPersistEK_WithTransientKey(t *testing.T) {
 	defer thetpm.Close()
 
 	// Create a transient EK manually
-	createCmd := tpm2.CreatePrimary{
-		PrimaryHandle: tpm2.AuthHandle{
-			Handle: tpm2.TPMRHEndorsement,
-			Auth:   tpmutil.NoAuth,
-		},
-		InPublic: tpm2.New2B(tpmutil.RSAEKTemplate),
-	}
-	transientEK, err := tpmutil.CreatePrimary(thetpm, createCmd)
+	transientEK, err := tpmutil.CreatePrimary(thetpm, &tpmutil.CreatePrimaryConfig{
+		PrimaryHandle: tpm2.TPMRHEndorsement,
+		Template:      tpmutil.RSAEKTemplate,
+	})
 	if err != nil {
 		t.Fatalf("CreatePrimary failed: %v", err)
 	}
