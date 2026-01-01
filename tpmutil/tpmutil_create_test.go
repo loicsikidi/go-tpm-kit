@@ -74,6 +74,258 @@ func TestCreate(t *testing.T) {
 			t.Errorf("Expected public type RSA, got %v", public.Type)
 		}
 	})
+
+	t.Run("with both userAuth and data", func(t *testing.T) {
+		userAuth := []byte("my-secret-password")
+		sealingData := []byte("data-to-seal")
+
+		parentHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
+			PrimaryHandle: tpm2.TPMRHOwner,
+			Template:      tpmutil.RSASRKTemplate,
+		})
+		if err != nil {
+			t.Fatalf("CreatePrimary() failed: %v", err)
+		}
+		defer parentHandle.Close()
+
+		template := tpm2.TPMTPublic{
+			Type:    tpm2.TPMAlgKeyedHash,
+			NameAlg: tpm2.TPMAlgSHA256,
+			ObjectAttributes: tpm2.TPMAObject{
+				FixedTPM:     true,
+				FixedParent:  true,
+				UserWithAuth: true,
+			},
+		}
+
+		keyHandle, err := tpmutil.Create(thetpm, tpmutil.CreateConfig{
+			ParentHandle: parentHandle,
+			Template:     template,
+			UserAuth:     userAuth,
+			SealingData:  sealingData,
+		})
+		if err != nil {
+			t.Fatalf("Create() failed: %v", err)
+		}
+		defer keyHandle.Close()
+
+		unsealCmd := tpm2.Unseal{
+			ItemHandle: tpm2.AuthHandle{
+				Handle: keyHandle.Handle(),
+				Name:   keyHandle.Name(),
+				Auth:   tpm2.PasswordAuth(userAuth),
+			},
+		}
+		unsealRsp, err := unsealCmd.Execute(thetpm)
+		if err != nil {
+			t.Fatalf("Unseal() failed: %v", err)
+		}
+
+		if string(unsealRsp.OutData.Buffer) != string(sealingData) {
+			t.Errorf("Expected unsealed data %q, got %q", sealingData, unsealRsp.OutData.Buffer)
+		}
+	})
+
+	t.Run("with only userAuth", func(t *testing.T) {
+		userAuth := []byte("my-secret-password")
+
+		parentHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
+			PrimaryHandle: tpm2.TPMRHOwner,
+			Template:      tpmutil.ECCSRKTemplate,
+		})
+		if err != nil {
+			t.Fatalf("CreatePrimary() failed: %v", err)
+		}
+		defer parentHandle.Close()
+
+		signingTemplate := tpm2.TPMTPublic{
+			Type:    tpm2.TPMAlgECC,
+			NameAlg: tpm2.TPMAlgSHA256,
+			ObjectAttributes: tpm2.TPMAObject{
+				SignEncrypt:         true,
+				FixedTPM:            true,
+				FixedParent:         true,
+				SensitiveDataOrigin: true,
+				UserWithAuth:        true,
+			},
+			Parameters: tpm2.NewTPMUPublicParms(
+				tpm2.TPMAlgECC,
+				&tpm2.TPMSECCParms{
+					Scheme: tpm2.TPMTECCScheme{
+						Scheme: tpm2.TPMAlgECDSA,
+						Details: tpm2.NewTPMUAsymScheme(
+							tpm2.TPMAlgECDSA,
+							&tpm2.TPMSSigSchemeECDSA{
+								HashAlg: tpm2.TPMAlgSHA256,
+							},
+						),
+					},
+					CurveID: tpm2.TPMECCNistP256,
+				},
+			),
+		}
+
+		keyHandle, err := tpmutil.Create(thetpm, tpmutil.CreateConfig{
+			ParentHandle: parentHandle,
+			Template:     signingTemplate,
+			UserAuth:     userAuth,
+		})
+		if err != nil {
+			t.Fatalf("Create() failed: %v", err)
+		}
+		defer keyHandle.Close()
+
+		digest := make([]byte, 32)
+		for i := range digest {
+			digest[i] = byte(i)
+		}
+		signCmd := tpm2.Sign{
+			KeyHandle: tpm2.AuthHandle{
+				Handle: keyHandle.Handle(),
+				Name:   keyHandle.Name(),
+				Auth:   tpm2.PasswordAuth(userAuth),
+			},
+			Digest: tpm2.TPM2BDigest{Buffer: digest},
+			InScheme: tpm2.TPMTSigScheme{
+				Scheme: tpm2.TPMAlgECDSA,
+				Details: tpm2.NewTPMUSigScheme(
+					tpm2.TPMAlgECDSA,
+					&tpm2.TPMSSchemeHash{
+						HashAlg: tpm2.TPMAlgSHA256,
+					},
+				),
+			},
+			Validation: tpm2.TPMTTKHashCheck{
+				Tag: tpm2.TPMSTHashCheck,
+			},
+		}
+
+		signRsp, err := signCmd.Execute(thetpm)
+		if err != nil {
+			t.Fatalf("Sign() failed: %v", err)
+		}
+
+		if signRsp.Signature.SigAlg != tpm2.TPMAlgECDSA {
+			t.Errorf("Expected signature algorithm ECDSA, got %v", signRsp.Signature.SigAlg)
+		}
+
+		wrongAuthCmd := tpm2.Sign{
+			KeyHandle: tpm2.AuthHandle{
+				Handle: keyHandle.Handle(),
+				Name:   keyHandle.Name(),
+				Auth:   tpm2.PasswordAuth([]byte("wrong-password")),
+			},
+			Digest: tpm2.TPM2BDigest{Buffer: digest},
+			InScheme: tpm2.TPMTSigScheme{
+				Scheme: tpm2.TPMAlgECDSA,
+				Details: tpm2.NewTPMUSigScheme(
+					tpm2.TPMAlgECDSA,
+					&tpm2.TPMSSchemeHash{
+						HashAlg: tpm2.TPMAlgSHA256,
+					},
+				),
+			},
+			Validation: tpm2.TPMTTKHashCheck{
+				Tag: tpm2.TPMSTHashCheck,
+			},
+		}
+
+		_, err = wrongAuthCmd.Execute(thetpm)
+		if err == nil {
+			t.Error("Expected Sign() to fail with wrong password")
+		}
+	})
+
+	t.Run("with only sealingData", func(t *testing.T) {
+		sealingData := []byte("data-to-seal")
+
+		parentHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
+			PrimaryHandle: tpm2.TPMRHOwner,
+			Template:      tpmutil.RSASRKTemplate,
+		})
+		if err != nil {
+			t.Fatalf("CreatePrimary() failed: %v", err)
+		}
+		defer parentHandle.Close()
+
+		template := tpm2.TPMTPublic{
+			Type:    tpm2.TPMAlgKeyedHash,
+			NameAlg: tpm2.TPMAlgSHA256,
+			ObjectAttributes: tpm2.TPMAObject{
+				FixedTPM:     true,
+				FixedParent:  true,
+				UserWithAuth: true,
+			},
+		}
+
+		keyHandle, err := tpmutil.Create(thetpm, tpmutil.CreateConfig{
+			ParentHandle: parentHandle,
+			Template:     template,
+			SealingData:  sealingData,
+		})
+		if err != nil {
+			t.Fatalf("Create() failed: %v", err)
+		}
+		defer keyHandle.Close()
+
+		unsealCmd := tpm2.Unseal{
+			ItemHandle: tpm2.AuthHandle{
+				Handle: keyHandle.Handle(),
+				Name:   keyHandle.Name(),
+				Auth:   tpm2.PasswordAuth(nil),
+			},
+		}
+		unsealRsp, err := unsealCmd.Execute(thetpm)
+		if err != nil {
+			t.Fatalf("Unseal() failed: %v", err)
+		}
+
+		if string(unsealRsp.OutData.Buffer) != string(sealingData) {
+			t.Errorf("Expected unsealed data %q, got %q", sealingData, unsealRsp.OutData.Buffer)
+		}
+	})
+
+	t.Run("with neither userAuth nor sealingData", func(t *testing.T) {
+		parentHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
+			PrimaryHandle: tpm2.TPMRHOwner,
+			Template:      tpmutil.RSASRKTemplate,
+		})
+		if err != nil {
+			t.Fatalf("CreatePrimary() failed: %v", err)
+		}
+		defer parentHandle.Close()
+
+		keyHandle, err := tpmutil.Create(thetpm, tpmutil.CreateConfig{
+			ParentHandle: parentHandle,
+			Template:     tpmutil.RSASRKTemplate,
+		})
+		if err != nil {
+			t.Fatalf("Create() failed: %v", err)
+		}
+		defer keyHandle.Close()
+	})
+
+	t.Run("with empty slices", func(t *testing.T) {
+		parentHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
+			PrimaryHandle: tpm2.TPMRHOwner,
+			Template:      tpmutil.RSASRKTemplate,
+		})
+		if err != nil {
+			t.Fatalf("CreatePrimary() failed: %v", err)
+		}
+		defer parentHandle.Close()
+
+		keyHandle, err := tpmutil.Create(thetpm, tpmutil.CreateConfig{
+			ParentHandle: parentHandle,
+			Template:     tpmutil.ECCSRKTemplate,
+			UserAuth:     []byte{},
+			SealingData:  []byte{},
+		})
+		if err != nil {
+			t.Fatalf("Create() failed: %v", err)
+		}
+		defer keyHandle.Close()
+	})
 }
 
 func TestCreateWithResult(t *testing.T) {
