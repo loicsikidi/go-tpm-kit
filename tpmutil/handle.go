@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils"
 )
 
 // HandleType represents the different types of handles in TPM 2.0.
@@ -206,12 +207,32 @@ func ToHandle(t transport.TPM, handle any) (Handle, error) {
 		if err != nil {
 			return nil, fmt.Errorf("tpm2.ReadPublic() failed: %w", err)
 		}
-		return NewHandle(&tpm2.NamedHandle{Handle: h, Name: rsp.Name}), nil
+		pub, err := rsp.OutPublic.Contents()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get public contents: %w", err)
+		}
+		return &tpmHandle{
+			handle: &tpm2.NamedHandle{Handle: h, Name: rsp.Name},
+			tpm:    t,
+			public: pub,
+		}, nil
 	case Handle:
 		return h, nil
 	default:
 		return nil, fmt.Errorf("expected tpm2.TPMHandle or a struct implementing tpmutil.Handle, got %T", h)
 	}
+}
+
+// ToAuthHandle converts a Handle to an authorization Handle with the given session.
+//
+// Note: if no session is provided, NoAuth is used by default.
+func ToAuthHandle(h Handle, optionalAuth ...tpm2.Session) Handle {
+	auth := utils.OptionalArgWithDefault(optionalAuth, NoAuth)
+	return NewHandle(&tpm2.AuthHandle{
+		Handle: h.Handle(),
+		Name:   h.Name(),
+		Auth:   auth,
+	})
 }
 
 // isAuthHandle checks if the given handle is an authorization handle.

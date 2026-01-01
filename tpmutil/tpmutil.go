@@ -818,6 +818,12 @@ func Create(t transport.TPM, optionalCfg ...CreateConfig) (HandleCloser, error) 
 //		log.Fatal(err)
 //	}
 //
+//	// marshal the result in order to store or transmit it
+//	b, err := result.Marshal()
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
 //	// Later, load the created key
 //	keyHandle, err := tpmutil.Load(tpm, &tpmutil.LoadConfig{
 //		ParentHandle: srkHandle,
