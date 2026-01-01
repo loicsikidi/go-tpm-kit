@@ -299,6 +299,53 @@ func (c *CreatePrimaryConfig) CheckAndSetDefault() error {
 	return nil
 }
 
+// CreateConfig holds configuration for TPM Create operations.
+type CreateConfig struct {
+	// ParentHandle is the handle of the parent key.
+	//
+	// Required.
+	ParentHandle Handle
+	// ParentAuth is the authorization session for the parent key.
+	//
+	// Default: [NoAuth].
+	ParentAuth tpm2.Session
+	// Template specifies the key template to use for the created object.
+	//
+	// Required.
+	Template tpm2.TPMTPublic
+	// UserAuth is the user authorization value for the created object.
+	//
+	// Default: nil.
+	UserAuth []byte
+	// SealingData is the sensitive data associated with the created object.
+	//
+	// This field can be provided when you want to seal data with the created object.
+	//
+	// Note: this field is accepted if the Template is of type [tpm2.TPMAlgKeyedHash].
+	//
+	// Default: nil.
+	SealingData []byte
+}
+
+// CheckAndSetDefault validates and sets default values for CreateConfig.
+func (c *CreateConfig) CheckAndSetDefault() error {
+	if c.ParentHandle == nil {
+		return ErrMissingHandle
+	}
+	if c.ParentAuth == nil {
+		c.ParentAuth = NoAuth
+	}
+	if len(c.SealingData) > 0 {
+		if c.Template.Type != tpm2.TPMAlgKeyedHash {
+			return fmt.Errorf("invalid input: SealingData can only be provided if Template.Type is TPMAlgKeyedHash")
+		}
+		if c.Template.ObjectAttributes.SensitiveDataOrigin {
+			return fmt.Errorf("invalid input: SealingData cannot be provided if Template.ObjectAttributes.SensitiveDataOrigin is set")
+		}
+	}
+	return nil
+}
+
 // LoadConfig holds configuration for TPM Load operations.
 type LoadConfig struct {
 	// ParentHandle is the handle of the parent key.
