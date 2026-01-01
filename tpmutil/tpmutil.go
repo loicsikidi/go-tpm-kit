@@ -49,7 +49,7 @@ const maxBufferSize = tpmkit.MaxBufferSize
 //
 // Note: If cfg is nil, default configuration is used.
 func NVRead(t transport.TPM, optionalCfg ...NVReadConfig) ([]byte, error) {
-	cfg, _ := utils.OptionalArg(optionalCfg)
+	cfg := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func nvRead(t transport.TPM, hierarchy, index tpm2.TPMHandle, auth tpm2.Session,
 //
 // Note: If cfg is nil, default configuration is used.
 func NVWrite(t transport.TPM, optionalCfg ...NVWriteConfig) error {
-	cfg, _ := utils.OptionalArg(optionalCfg)
+	cfg := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return err
 	}
@@ -212,7 +212,7 @@ type HashResult struct {
 //	}
 //	fmt.Printf("Digest: %x\n", result.Digest)
 func Hash(t transport.TPM, optionalCfg ...HashConfig) (*HashResult, error) {
-	cfg, _ := utils.OptionalArg(optionalCfg)
+	cfg := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
 	}
@@ -310,7 +310,7 @@ func hash(t transport.TPM, hierarchy tpm2.TPMHandle, password string, blockSize 
 //	}
 //	fmt.Printf("Signature: %x\n", signature)
 func Sign(t transport.TPM, optionalCfg ...SignConfig) ([]byte, error) {
-	cfg, _ := utils.OptionalArg(optionalCfg)
+	cfg := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
 	}
@@ -395,7 +395,7 @@ func formatRSASignature(sig tpm2.TPMTSignature, alg tpm2.TPMAlgID) ([]byte, erro
 //
 // Note: If cfg is nil, default configuration is used.
 func GetSKRHandle(t transport.TPM, optionalCfg ...ParentConfig) (Handle, error) {
-	cfg, _ := utils.OptionalArg(optionalCfg)
+	cfg := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
 	}
@@ -469,7 +469,7 @@ func GetSKRHandle(t transport.TPM, optionalCfg ...ParentConfig) (Handle, error) 
 //
 // Note: If cfg is nil, default configuration is used (RSA EK at handle 0x81010001).
 func GetEKHandle(t transport.TPM, optionalCfg ...EKParentConfig) (Handle, error) {
-	cfg, _ := utils.OptionalArg(optionalCfg)
+	cfg := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
 	}
@@ -536,7 +536,7 @@ func getEKTemplate(keyType KeyType, isLowRange bool) (tpm2.TPMTPublic, error) {
 //
 // Note: If cfg is nil, default configuration is used.
 func PersistEK(t transport.TPM, optionalCfg ...EKParentConfig) (Handle, error) {
-	cfg, _ := utils.OptionalArg(optionalCfg)
+	cfg := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
 	}
@@ -619,7 +619,7 @@ func PersistEK(t transport.TPM, optionalCfg ...EKParentConfig) (Handle, error) {
 // Example:
 //
 //	// Create an ECC primary key in the owner hierarchy
-//	eccTemplate := tpm2.ECCSRKTemplate
+//	eccTemplate := tpmutil.ECCSRKTemplate
 //	primaryHandle, err := tpmutil.CreatePrimary(tpm, &tpmutil.CreatePrimaryConfig{
 //		PrimaryHandle: tpm2.TPMRHOwner,
 //		Template:      &eccTemplate,
@@ -631,26 +631,15 @@ func PersistEK(t transport.TPM, optionalCfg ...EKParentConfig) (Handle, error) {
 //
 // Note: If cfg is nil, default configuration is used.
 func CreatePrimary(t transport.TPM, optionalCfg ...CreatePrimaryConfig) (HandleCloser, error) {
-	cfg, _ := utils.OptionalArg(optionalCfg)
-	if err := cfg.CheckAndSetDefault(); err != nil {
-		return nil, err
-	}
-
-	cmd := tpm2.CreatePrimary{
-		PrimaryHandle: tpm2.AuthHandle{
-			Handle: cfg.PrimaryHandle,
-			Auth:   cfg.Auth,
-		},
-		InPublic: tpm2.New2B(cfg.Template),
-	}
-
-	rsp, err := cmd.Execute(t)
+	rsp, closer, err := CreatePrimaryWithResult(t, optionalCfg...)
 	if err != nil {
 		return nil, err
 	}
 
 	public, err := rsp.OutPublic.Contents()
 	if err != nil {
+		// Close the handle before returning the error
+		_ = closer()
 		return nil, err
 	}
 
@@ -663,13 +652,13 @@ func CreatePrimary(t transport.TPM, optionalCfg ...CreatePrimaryConfig) (HandleC
 	return hc, nil
 }
 
-// CreatePrimaryWithResponse creates a primary key in the TPM and returns the response along with a closer function.
+// CreatePrimaryWithResult creates a primary key in the TPM and returns the result along with a closer function.
 //
 // Example:
 //
 //	// Create an RSA primary key and get the full response
 //	rsaTemplate := tpm2.RSASRKTemplate
-//	createPrimaryRsp, closer, err := tpmutil.CreatePrimaryWithResponse(tpm, &tpmutil.CreatePrimaryConfig{
+//	result, closer, err := tpmutil.CreatePrimaryWithResult(tpm, &tpmutil.CreatePrimaryConfig{
 //		PrimaryHandle: tpm2.TPMRHOwner,
 //		Template:      &rsaTemplate,
 //	})
@@ -679,8 +668,8 @@ func CreatePrimary(t transport.TPM, optionalCfg ...CreatePrimaryConfig) (HandleC
 //	defer closer()
 //
 // Note: If cfg is nil, default configuration is used.
-func CreatePrimaryWithResponse(t transport.TPM, optionalCfg ...CreatePrimaryConfig) (*tpm2.CreatePrimaryResponse, func() error, error) {
-	cfg, _ := utils.OptionalArg(optionalCfg)
+func CreatePrimaryWithResult(t transport.TPM, optionalCfg ...CreatePrimaryConfig) (*CreatePrimaryResult, func() error, error) {
+	cfg := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, nil, err
 	}
@@ -698,11 +687,19 @@ func CreatePrimaryWithResponse(t transport.TPM, optionalCfg ...CreatePrimaryConf
 		return nil, nil, err
 	}
 
+	result := &CreatePrimaryResult{
+		ObjectHandle:   rsp.ObjectHandle,
+		OutPublic:      rsp.OutPublic,
+		CreationHash:   rsp.CreationHash,
+		CreationTicket: rsp.CreationTicket,
+		Name:           rsp.Name,
+	}
+
 	closer := func() error {
 		_, err := (&tpm2.FlushContext{FlushHandle: rsp.ObjectHandle}).Execute(t)
 		return err
 	}
-	return rsp, closer, nil
+	return result, closer, nil
 }
 
 // Load loads a key into the TPM and returns a [HandleCloser].
@@ -722,7 +719,7 @@ func CreatePrimaryWithResponse(t transport.TPM, optionalCfg ...CreatePrimaryConf
 //
 // Note: If cfg is nil, default configuration is used.
 func Load(t transport.TPM, optionalCfg ...LoadConfig) (HandleCloser, error) {
-	cfg, _ := utils.OptionalArg(optionalCfg)
+	cfg := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
 	}
@@ -754,4 +751,128 @@ func Load(t transport.TPM, optionalCfg ...LoadConfig) (HandleCloser, error) {
 		public: public,
 	}
 	return hc, nil
+}
+
+// Create creates a child key under a parent key in the TPM and loads it.
+//
+// This is a convenience function that combines [CreateWithResult] and [Load].
+// Use [CreateWithResult] if you need the encrypted private/public portions
+// for later use without loading the key immediately.
+//
+// Example:
+//
+//	// Create a child key under an existing parent
+//	srkHandle, err := tpmutil.GetSKRHandle(tpm)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	eccTemplate := tpmutil.ECCSRKTemplate
+//	keyHandle, err := tpmutil.Create(tpm, tpmutil.CreateConfig{
+//		ParentHandle: srkHandle,
+//		Template:     eccTemplate,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer keyHandle.Close()
+//
+// Note: If cfg is nil, default configuration is used.
+func Create(t transport.TPM, optionalCfg ...CreateConfig) (HandleCloser, error) {
+	cfg := utils.OptionalArg(optionalCfg) // cfg will be checked in CreateWithResult
+
+	result, err := CreateWithResult(t, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return Load(t, LoadConfig{
+		ParentHandle: cfg.ParentHandle,
+		InPrivate:    result.OutPrivate,
+		InPublic:     result.OutPublic,
+		Auth:         cfg.ParentAuth,
+	})
+}
+
+// CreateWithResult creates a child key under a parent key in the TPM and returns the result.
+//
+// This function returns the encrypted private and public portions that can later be loaded with [Load].
+//
+// Use this function if you need to marshal the created key material for storage or transmission.
+// For direct loading, use [Create] instead.
+//
+// Example:
+//
+//	// CreateWithResult a child key under an existing parent
+//	srkHandle, err := tpmutil.GetSKRHandle(tpm)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	eccTemplate := tpmutil.ECCSRKTemplate
+//	result, err := tpmutil.CreateWithResult(tpm, &tpmutil.CreateConfig{
+//		ParentHandle: srkHandle,
+//		Template:     &eccTemplate,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Later, load the created key
+//	keyHandle, err := tpmutil.Load(tpm, &tpmutil.LoadConfig{
+//		ParentHandle: srkHandle,
+//		InPrivate:    result.OutPrivate,
+//		InPublic:     result.OutPublic,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer keyHandle.Close()
+//
+// Note: If cfg is nil, default configuration is used.
+func CreateWithResult(t transport.TPM, optionalCfg ...CreateConfig) (*CreateResult, error) {
+	cfg := utils.OptionalArg(optionalCfg)
+	if err := cfg.CheckAndSetDefault(); err != nil {
+		return nil, err
+	}
+
+	cmd := tpm2.Create{
+		ParentHandle: tpm2.AuthHandle{
+			Handle: cfg.ParentHandle.Handle(),
+			Name:   cfg.ParentHandle.Name(),
+			Auth:   cfg.ParentAuth,
+		},
+		InSensitive: toTPM2BSensitiveCreate(cfg.UserAuth, cfg.SealingData),
+		InPublic:    tpm2.New2B(cfg.Template),
+	}
+
+	rsp, err := cmd.Execute(t)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CreateResult{
+		OutPrivate:     rsp.OutPrivate,
+		OutPublic:      rsp.OutPublic,
+		CreationHash:   rsp.CreationHash,
+		CreationTicket: rsp.CreationTicket,
+	}, nil
+}
+
+// toTPM2BSensitiveCreate converts userAuth and data into a TPM2BSensitiveCreate structure.
+func toTPM2BSensitiveCreate(userAuth, data []byte) tpm2.TPM2BSensitiveCreate {
+	sensitive := tpm2.TPM2BSensitiveCreate{}
+	if len(userAuth) > 0 {
+		sensitive.Sensitive = &tpm2.TPMSSensitiveCreate{
+			UserAuth: tpm2.TPM2BAuth{
+				Buffer: userAuth,
+			},
+		}
+	}
+	if len(data) > 0 {
+		sensitive.Sensitive.Data = tpm2.NewTPMUSensitiveCreate(&tpm2.TPM2BSensitiveData{
+			Buffer: data,
+		})
+	}
+	return sensitive
 }

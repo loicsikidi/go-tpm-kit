@@ -588,7 +588,7 @@ go test -v ./tpmsession
 
 ## Examples
 
-See the [session_test.go](./session_test.go) file for comprehensive examples of:
+See the [session_simulated_test.go](./session_simulated_test.go) file for comprehensive examples of:
 - Creating bound and salted sessions
 - Using different hash algorithms
 - Serializing and deserializing session keys
