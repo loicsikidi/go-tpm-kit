@@ -861,12 +861,12 @@ func CreateWithResult(t transport.TPM, optionalCfg ...CreateConfig) (*CreateResu
 
 // toTPM2BSensitiveCreate converts userAuth and data into a TPM2BSensitiveCreate structure.
 func toTPM2BSensitiveCreate(userAuth, data []byte) tpm2.TPM2BSensitiveCreate {
-	sensitive := tpm2.TPM2BSensitiveCreate{}
+	sensitive := tpm2.TPM2BSensitiveCreate{
+		Sensitive: &tpm2.TPMSSensitiveCreate{},
+	}
 	if len(userAuth) > 0 {
-		sensitive.Sensitive = &tpm2.TPMSSensitiveCreate{
-			UserAuth: tpm2.TPM2BAuth{
-				Buffer: userAuth,
-			},
+		sensitive.Sensitive.UserAuth = tpm2.TPM2BAuth{
+			Buffer: userAuth,
 		}
 	}
 	if len(data) > 0 {
