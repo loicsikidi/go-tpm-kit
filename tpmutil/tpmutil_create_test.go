@@ -19,7 +19,7 @@ func TestCreate(t *testing.T) {
 		eccTemplate := tpmutil.ECCSRKTemplate
 		parentHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 			PrimaryHandle: tpm2.TPMRHOwner,
-			Template:      eccTemplate,
+			InPublic:      eccTemplate,
 		})
 		if err != nil {
 			t.Fatalf("CreatePrimary() failed: %v", err)
@@ -28,7 +28,7 @@ func TestCreate(t *testing.T) {
 
 		keyHandle, err := tpmutil.Create(thetpm, tpmutil.CreateConfig{
 			ParentHandle: parentHandle,
-			Template:     eccTemplate,
+			InPublic:     eccTemplate,
 		})
 		if err != nil {
 			t.Fatalf("Create() failed: %v", err)
@@ -49,7 +49,7 @@ func TestCreate(t *testing.T) {
 		rsaTemplate := tpmutil.RSASRKTemplate
 		parentHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 			PrimaryHandle: tpm2.TPMRHOwner,
-			Template:      rsaTemplate,
+			InPublic:      rsaTemplate,
 		})
 		if err != nil {
 			t.Fatalf("CreatePrimary() failed: %v", err)
@@ -58,7 +58,7 @@ func TestCreate(t *testing.T) {
 
 		keyHandle, err := tpmutil.Create(thetpm, tpmutil.CreateConfig{
 			ParentHandle: parentHandle,
-			Template:     rsaTemplate,
+			InPublic:     rsaTemplate,
 		})
 		if err != nil {
 			t.Fatalf("Create() failed: %v", err)
@@ -81,7 +81,7 @@ func TestCreate(t *testing.T) {
 
 		parentHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 			PrimaryHandle: tpm2.TPMRHOwner,
-			Template:      tpmutil.RSASRKTemplate,
+			InPublic:      tpmutil.RSASRKTemplate,
 		})
 		if err != nil {
 			t.Fatalf("CreatePrimary() failed: %v", err)
@@ -100,7 +100,7 @@ func TestCreate(t *testing.T) {
 
 		keyHandle, err := tpmutil.Create(thetpm, tpmutil.CreateConfig{
 			ParentHandle: parentHandle,
-			Template:     template,
+			InPublic:     template,
 			UserAuth:     userAuth,
 			SealingData:  sealingData,
 		})
@@ -127,7 +127,7 @@ func TestCreate(t *testing.T) {
 
 		parentHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 			PrimaryHandle: tpm2.TPMRHOwner,
-			Template:      tpmutil.ECCSRKTemplate,
+			InPublic:      tpmutil.ECCSRKTemplate,
 		})
 		if err != nil {
 			t.Fatalf("CreatePrimary() failed: %v", err)
@@ -163,7 +163,7 @@ func TestCreate(t *testing.T) {
 
 		keyHandle, err := tpmutil.Create(thetpm, tpmutil.CreateConfig{
 			ParentHandle: parentHandle,
-			Template:     signingTemplate,
+			InPublic:     signingTemplate,
 			UserAuth:     userAuth,
 		})
 		if err != nil {
@@ -229,7 +229,7 @@ func TestCreate(t *testing.T) {
 
 		parentHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 			PrimaryHandle: tpm2.TPMRHOwner,
-			Template:      tpmutil.RSASRKTemplate,
+			InPublic:      tpmutil.RSASRKTemplate,
 		})
 		if err != nil {
 			t.Fatalf("CreatePrimary() failed: %v", err)
@@ -248,7 +248,7 @@ func TestCreate(t *testing.T) {
 
 		keyHandle, err := tpmutil.Create(thetpm, tpmutil.CreateConfig{
 			ParentHandle: parentHandle,
-			Template:     template,
+			InPublic:     template,
 			SealingData:  sealingData,
 		})
 		if err != nil {
@@ -272,7 +272,7 @@ func TestCreate(t *testing.T) {
 	t.Run("with neither userAuth nor sealingData", func(t *testing.T) {
 		parentHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 			PrimaryHandle: tpm2.TPMRHOwner,
-			Template:      tpmutil.RSASRKTemplate,
+			InPublic:      tpmutil.RSASRKTemplate,
 		})
 		if err != nil {
 			t.Fatalf("CreatePrimary() failed: %v", err)
@@ -281,7 +281,7 @@ func TestCreate(t *testing.T) {
 
 		keyHandle, err := tpmutil.Create(thetpm, tpmutil.CreateConfig{
 			ParentHandle: parentHandle,
-			Template:     tpmutil.RSASRKTemplate,
+			InPublic:     tpmutil.RSASRKTemplate,
 		})
 		if err != nil {
 			t.Fatalf("Create() failed: %v", err)
@@ -292,7 +292,7 @@ func TestCreate(t *testing.T) {
 	t.Run("with empty slices", func(t *testing.T) {
 		parentHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 			PrimaryHandle: tpm2.TPMRHOwner,
-			Template:      tpmutil.RSASRKTemplate,
+			InPublic:      tpmutil.RSASRKTemplate,
 		})
 		if err != nil {
 			t.Fatalf("CreatePrimary() failed: %v", err)
@@ -301,7 +301,7 @@ func TestCreate(t *testing.T) {
 
 		keyHandle, err := tpmutil.Create(thetpm, tpmutil.CreateConfig{
 			ParentHandle: parentHandle,
-			Template:     tpmutil.ECCSRKTemplate,
+			InPublic:     tpmutil.ECCSRKTemplate,
 			UserAuth:     []byte{},
 			SealingData:  []byte{},
 		})
@@ -324,7 +324,7 @@ func TestCreateWithResult(t *testing.T) {
 		eccTemplate := tpmutil.ECCSRKTemplate
 		parentHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 			PrimaryHandle: tpm2.TPMRHOwner,
-			Template:      eccTemplate,
+			InPublic:      eccTemplate,
 		})
 		if err != nil {
 			t.Fatalf("CreatePrimary() failed: %v", err)
@@ -334,7 +334,7 @@ func TestCreateWithResult(t *testing.T) {
 		// Create a child key
 		result, err := tpmutil.CreateWithResult(thetpm, tpmutil.CreateConfig{
 			ParentHandle: parentHandle,
-			Template:     eccTemplate,
+			InPublic:     eccTemplate,
 		})
 		if err != nil {
 			t.Fatalf("Create() failed: %v", err)
@@ -378,7 +378,7 @@ func TestCreateWithResult(t *testing.T) {
 		rsaTemplate := tpmutil.RSASRKTemplate
 		parentHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 			PrimaryHandle: tpm2.TPMRHOwner,
-			Template:      rsaTemplate,
+			InPublic:      rsaTemplate,
 		})
 		if err != nil {
 			t.Fatalf("CreatePrimary() failed: %v", err)
@@ -388,7 +388,7 @@ func TestCreateWithResult(t *testing.T) {
 		// Create a child key
 		result, err := tpmutil.CreateWithResult(thetpm, tpmutil.CreateConfig{
 			ParentHandle: parentHandle,
-			Template:     rsaTemplate,
+			InPublic:     rsaTemplate,
 		})
 		if err != nil {
 			t.Fatalf("Create() failed: %v", err)
@@ -434,7 +434,7 @@ func TestCreateConfig_CheckAndSetDefault(t *testing.T) {
 		eccTemplate := tpmutil.ECCSRKTemplate
 		cfg := tpmutil.CreateConfig{
 			ParentHandle: handle,
-			Template:     eccTemplate,
+			InPublic:     eccTemplate,
 		}
 
 		err := cfg.CheckAndSetDefault()
@@ -450,7 +450,7 @@ func TestCreateConfig_CheckAndSetDefault(t *testing.T) {
 	t.Run("missing parent handle", func(t *testing.T) {
 		eccTemplate := tpmutil.ECCSRKTemplate
 		cfg := tpmutil.CreateConfig{
-			Template: eccTemplate,
+			InPublic: eccTemplate,
 		}
 
 		err := cfg.CheckAndSetDefault()
@@ -467,7 +467,7 @@ func TestCreateConfig_CheckAndSetDefault(t *testing.T) {
 
 		cfg := tpmutil.CreateConfig{
 			ParentHandle: handle,
-			Template:     tpmutil.ECCSRKTemplate,
+			InPublic:     tpmutil.ECCSRKTemplate,
 			SealingData:  []byte("secret data"),
 		}
 
@@ -476,7 +476,7 @@ func TestCreateConfig_CheckAndSetDefault(t *testing.T) {
 			t.Error("Expected error when SealingData is provided with non-KeyedHash template")
 		}
 
-		expectedMsg := "invalid input: SealingData can only be provided if Template.Type is TPMAlgKeyedHash"
+		expectedMsg := "invalid input: SealingData can only be provided if InPublic.Type is TPMAlgKeyedHash"
 		if err != nil && err.Error() != expectedMsg {
 			t.Errorf("Expected error message %q, got %q", expectedMsg, err.Error())
 		}
@@ -490,7 +490,7 @@ func TestCreateConfig_CheckAndSetDefault(t *testing.T) {
 
 		cfg := tpmutil.CreateConfig{
 			ParentHandle: handle,
-			Template: tpm2.TPMTPublic{
+			InPublic: tpm2.TPMTPublic{
 				Type: tpm2.TPMAlgKeyedHash,
 				ObjectAttributes: tpm2.TPMAObject{
 					SensitiveDataOrigin: true,
@@ -504,7 +504,7 @@ func TestCreateConfig_CheckAndSetDefault(t *testing.T) {
 			t.Error("Expected error when SealingData is provided with SensitiveDataOrigin set")
 		}
 
-		expectedMsg := "invalid input: SealingData cannot be provided if Template.ObjectAttributes.SensitiveDataOrigin is set"
+		expectedMsg := "invalid input: SealingData cannot be provided if InPublic.ObjectAttributes.SensitiveDataOrigin is set"
 		if err != nil && err.Error() != expectedMsg {
 			t.Errorf("Expected error message %q, got %q", expectedMsg, err.Error())
 		}

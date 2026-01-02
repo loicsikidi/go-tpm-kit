@@ -274,10 +274,10 @@ func (c *EKParentConfig) CheckAndSetDefault() error {
 
 // CreatePrimaryConfig holds configuration for TPM CreatePrimary operations.
 type CreatePrimaryConfig struct {
-	// Template specifies the key template to use.
+	// InPublic specifies the key template to use.
 	//
 	// Required.
-	Template tpm2.TPMTPublic
+	InPublic tpm2.TPMTPublic
 	// PrimaryHandle specifies which hierarchy to create the primary key under.
 	//
 	// Default: [tpm2.TPMRHOwner].
@@ -294,7 +294,7 @@ type CreatePrimaryConfig struct {
 	//
 	// This field can be provided when you want to seal data with the created primary object.
 	//
-	// Note: this field is accepted if the Template is of type [tpm2.TPMAlgKeyedHash].
+	// Note: this field is accepted if the InPublic is of type [tpm2.TPMAlgKeyedHash].
 	//
 	// Default: nil.
 	SealingData []byte
@@ -309,11 +309,11 @@ func (c *CreatePrimaryConfig) CheckAndSetDefault() error {
 		c.Auth = NoAuth
 	}
 	if len(c.SealingData) > 0 {
-		if c.Template.Type != tpm2.TPMAlgKeyedHash {
-			return fmt.Errorf("invalid input: SealingData can only be provided if Template.Type is TPMAlgKeyedHash")
+		if c.InPublic.Type != tpm2.TPMAlgKeyedHash {
+			return fmt.Errorf("invalid input: SealingData can only be provided if InPublic.Type is TPMAlgKeyedHash")
 		}
-		if c.Template.ObjectAttributes.SensitiveDataOrigin {
-			return fmt.Errorf("invalid input: SealingData cannot be provided if Template.ObjectAttributes.SensitiveDataOrigin is set")
+		if c.InPublic.ObjectAttributes.SensitiveDataOrigin {
+			return fmt.Errorf("invalid input: SealingData cannot be provided if InPublic.ObjectAttributes.SensitiveDataOrigin is set")
 		}
 	}
 	return nil
@@ -329,10 +329,10 @@ type CreateConfig struct {
 	//
 	// Default: [NoAuth].
 	ParentAuth tpm2.Session
-	// Template specifies the key template to use for the created object.
+	// InPublic specifies the key template to use for the created object.
 	//
 	// Required.
-	Template tpm2.TPMTPublic
+	InPublic tpm2.TPMTPublic
 	// UserAuth is the user authorization value for the created object.
 	//
 	// Default: nil.
@@ -341,7 +341,7 @@ type CreateConfig struct {
 	//
 	// This field can be provided when you want to seal data with the created object.
 	//
-	// Note: this field is accepted if the Template is of type [tpm2.TPMAlgKeyedHash].
+	// Note: this field is accepted if the InPublic is of type [tpm2.TPMAlgKeyedHash].
 	//
 	// Default: nil.
 	SealingData []byte
@@ -356,11 +356,11 @@ func (c *CreateConfig) CheckAndSetDefault() error {
 		c.ParentAuth = NoAuth
 	}
 	if len(c.SealingData) > 0 {
-		if c.Template.Type != tpm2.TPMAlgKeyedHash {
-			return fmt.Errorf("invalid input: SealingData can only be provided if Template.Type is TPMAlgKeyedHash")
+		if c.InPublic.Type != tpm2.TPMAlgKeyedHash {
+			return fmt.Errorf("invalid input: SealingData can only be provided if InPublic.Type is TPMAlgKeyedHash")
 		}
-		if c.Template.ObjectAttributes.SensitiveDataOrigin {
-			return fmt.Errorf("invalid input: SealingData cannot be provided if Template.ObjectAttributes.SensitiveDataOrigin is set")
+		if c.InPublic.ObjectAttributes.SensitiveDataOrigin {
+			return fmt.Errorf("invalid input: SealingData cannot be provided if InPublic.ObjectAttributes.SensitiveDataOrigin is set")
 		}
 	}
 	return nil

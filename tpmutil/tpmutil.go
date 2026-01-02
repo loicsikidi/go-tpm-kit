@@ -412,7 +412,7 @@ func GetSKRHandle(t transport.TPM, optionalCfg ...ParentConfig) (Handle, error) 
 	}
 
 	srkHandle, err := CreatePrimary(t, CreatePrimaryConfig{
-		Template:      srkTemplate,
+		InPublic:      srkTemplate,
 		PrimaryHandle: cfg.Hierarchy,
 		Auth:          cfg.Auth,
 	})
@@ -558,7 +558,7 @@ func PersistEK(t transport.TPM, optionalCfg ...EKParentConfig) (Handle, error) {
 
 		ekHandle, err := CreatePrimary(t, CreatePrimaryConfig{
 			PrimaryHandle: tpm2.TPMRHEndorsement,
-			Template:      template,
+			InPublic:      template,
 			Auth:          cfg.Auth,
 		})
 		if err != nil {
@@ -658,7 +658,7 @@ func CreatePrimaryWithResult(t transport.TPM, optionalCfg ...CreatePrimaryConfig
 	cmd := tpm2.CreatePrimary{
 		PrimaryHandle: ToAuthHandle(NewHandle(cfg.PrimaryHandle), cfg.Auth),
 		InSensitive:   toTPM2BSensitiveCreate(cfg.UserAuth, cfg.SealingData),
-		InPublic:      tpm2.New2B(cfg.Template),
+		InPublic:      tpm2.New2B(cfg.InPublic),
 	}
 
 	rsp, err := cmd.Execute(t)
@@ -821,7 +821,7 @@ func CreateWithResult(t transport.TPM, optionalCfg ...CreateConfig) (*CreateResu
 	cmd := tpm2.Create{
 		ParentHandle: ToAuthHandle(cfg.ParentHandle, cfg.ParentAuth),
 		InSensitive:  toTPM2BSensitiveCreate(cfg.UserAuth, cfg.SealingData),
-		InPublic:     tpm2.New2B(cfg.Template),
+		InPublic:     tpm2.New2B(cfg.InPublic),
 	}
 
 	rsp, err := cmd.Execute(t)
