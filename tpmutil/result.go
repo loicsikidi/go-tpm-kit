@@ -11,6 +11,10 @@ import (
 	"github.com/loicsikidi/go-tpm-kit/internal/utils"
 )
 
+// tpm2bCreationData is an alias for the TPM2B wrapper around TPMSCreationData.
+// This mirrors the internal type used in the go-tpm library.
+type tpm2bCreationData = tpm2.TPM2B[tpm2.TPMSCreationData, *tpm2.TPMSCreationData]
+
 // Target represents the marshaling format for [CreateResult].
 type Target int
 
@@ -52,16 +56,53 @@ type CreateResult struct {
 	OutPrivate tpm2.TPM2BPrivate
 	// OutPublic is the public portion of the created object.
 	OutPublic tpm2.TPM2BPublic
+	// CreationData contains a TPMS_CREATION_DATA.
+	CreationData tpm2bCreationData
 	// CreationHash is the digest of the creation data.
 	CreationHash tpm2.TPM2BDigest
 	// CreationTicket is the ticket that proves the association between the object and its creation data.
 	CreationTicket tpm2.TPMTTKCreation
 }
 
+// PublicArea returns the public area contents from [CreateResult.OutPublic],
+// or nil if an error occurs.
+//
+// Example:
+//
+//	result := CreateResult{...}
+//	if pub := result.PublicArea(); pub != nil {
+//	    fmt.Printf("Public area type: %v\n", pub.Type)
+//	}
+func (r CreateResult) PublicArea() *tpm2.TPMTPublic {
+	pub, err := r.OutPublic.Contents()
+	if err != nil {
+		return nil
+	}
+	return pub
+}
+
+// CreationInfo returns the creation data contents from [CreateResult.CreationData],
+// or nil if an error occurs.
+//
+// Example:
+//
+//	result := CreateResult{...}
+//	if info := result.CreationInfo(); info != nil {
+//	    fmt.Printf("PCR digest: %x\n", info.PCRDigest.Buffer)
+//	}
+func (r CreateResult) CreationInfo() *tpm2.TPMSCreationData {
+	info, err := r.CreationData.Contents()
+	if err != nil {
+		return nil
+	}
+	return info
+}
+
 // marshaledCreateResult is the JSON representation of [CreateResult].
 type marshaledCreateResult struct {
 	OutPrivate     []byte `json:"outPrivate"`
 	OutPublic      []byte `json:"outPublic"`
+	CreationData   []byte `json:"creationData"`
 	CreationHash   []byte `json:"creationHash"`
 	CreationTicket []byte `json:"creationTicket"`
 }
@@ -93,6 +134,7 @@ func (r CreateResult) Marshal(optionalTarget ...Target) ([]byte, error) {
 		marshaled := marshaledCreateResult{
 			OutPrivate:     tpm2.Marshal(r.OutPrivate),
 			OutPublic:      tpm2.Marshal(r.OutPublic),
+			CreationData:   tpm2.Marshal(r.CreationData),
 			CreationHash:   tpm2.Marshal(r.CreationHash),
 			CreationTicket: tpm2.Marshal(r.CreationTicket),
 		}
@@ -129,6 +171,10 @@ func LoadCreateResult(path string) (*CreateResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal OutPublic: %w", err)
 	}
+	creationData, err := tpm2.Unmarshal[tpm2bCreationData](marshaled.CreationData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal CreationData: %w", err)
+	}
 	creationHash, err := tpm2.Unmarshal[tpm2.TPM2BDigest](marshaled.CreationHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal CreationHash: %w", err)
@@ -141,6 +187,7 @@ func LoadCreateResult(path string) (*CreateResult, error) {
 	return &CreateResult{
 		OutPrivate:     *outPrivate,
 		OutPublic:      *outPublic,
+		CreationData:   *creationData,
 		CreationHash:   *creationHash,
 		CreationTicket: *creationTicket,
 	}, nil
@@ -152,6 +199,8 @@ type CreatePrimaryResult struct {
 	ObjectHandle tpm2.TPMHandle
 	// OutPublic is the public portion of the created object.
 	OutPublic tpm2.TPM2BPublic
+	// CreationData contains a TPMS_CREATION_DATA.
+	CreationData tpm2bCreationData
 	// CreationHash is the digest of the creation data.
 	CreationHash tpm2.TPM2BDigest
 	// CreationTicket is the ticket that proves the association between the object and its creation data.
@@ -160,11 +209,46 @@ type CreatePrimaryResult struct {
 	Name tpm2.TPM2BName
 }
 
+// PublicArea returns the public area contents from [CreatePrimaryResult.OutPublic],
+// or nil if an error occurs.
+//
+// Example:
+//
+//	result := CreatePrimaryResult{...}
+//	if pub := result.PublicArea(); pub != nil {
+//	    fmt.Printf("Public area type: %v\n", pub.Type)
+//	}
+func (r CreatePrimaryResult) PublicArea() *tpm2.TPMTPublic {
+	pub, err := r.OutPublic.Contents()
+	if err != nil {
+		return nil
+	}
+	return pub
+}
+
+// CreationInfo returns the creation data contents from [CreatePrimaryResult.CreationData],
+// or nil if an error occurs.
+//
+// Example:
+//
+//	result := CreatePrimaryResult{...}
+//	if info := result.CreationInfo(); info != nil {
+//	    fmt.Printf("PCR digest: %x\n", info.PCRDigest.Buffer)
+//	}
+func (r CreatePrimaryResult) CreationInfo() *tpm2.TPMSCreationData {
+	info, err := r.CreationData.Contents()
+	if err != nil {
+		return nil
+	}
+	return info
+}
+
 // marshaledCreatePrimaryResult is the JSON representation of [CreatePrimaryResult].
 //
 // Note: ObjectHandle is not marshaled as it is a transient handle.
 type marshaledCreatePrimaryResult struct {
 	OutPublic      []byte `json:"outPublic"`
+	CreationData   []byte `json:"creationData"`
 	CreationHash   []byte `json:"creationHash"`
 	CreationTicket []byte `json:"creationTicket"`
 	Name           []byte `json:"name"`
@@ -199,6 +283,7 @@ func (r CreatePrimaryResult) Marshal(optionalTarget ...Target) ([]byte, error) {
 	default:
 		marshaled := marshaledCreatePrimaryResult{
 			OutPublic:      tpm2.Marshal(r.OutPublic),
+			CreationData:   tpm2.Marshal(r.CreationData),
 			CreationHash:   tpm2.Marshal(r.CreationHash),
 			CreationTicket: tpm2.Marshal(r.CreationTicket),
 			Name:           tpm2.Marshal(r.Name),
@@ -235,6 +320,10 @@ func LoadCreatePrimaryResult(path string) (*CreatePrimaryResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal OutPublic: %w", err)
 	}
+	creationData, err := tpm2.Unmarshal[tpm2bCreationData](marshaled.CreationData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal CreationData: %w", err)
+	}
 	creationHash, err := tpm2.Unmarshal[tpm2.TPM2BDigest](marshaled.CreationHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal CreationHash: %w", err)
@@ -250,6 +339,7 @@ func LoadCreatePrimaryResult(path string) (*CreatePrimaryResult, error) {
 
 	return &CreatePrimaryResult{
 		OutPublic:      *outPublic,
+		CreationData:   *creationData,
 		CreationHash:   *creationHash,
 		CreationTicket: *creationTicket,
 		Name:           *name,

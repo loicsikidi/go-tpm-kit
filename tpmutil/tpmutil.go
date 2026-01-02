@@ -669,6 +669,7 @@ func CreatePrimaryWithResult(t transport.TPM, optionalCfg ...CreatePrimaryConfig
 	result := &CreatePrimaryResult{
 		ObjectHandle:   rsp.ObjectHandle,
 		OutPublic:      rsp.OutPublic,
+		CreationData:   rsp.CreationData,
 		CreationHash:   rsp.CreationHash,
 		CreationTicket: rsp.CreationTicket,
 		Name:           rsp.Name,
@@ -831,6 +832,7 @@ func CreateWithResult(t transport.TPM, optionalCfg ...CreateConfig) (*CreateResu
 	return &CreateResult{
 		OutPrivate:     rsp.OutPrivate,
 		OutPublic:      rsp.OutPublic,
+		CreationData:   rsp.CreationData,
 		CreationHash:   rsp.CreationHash,
 		CreationTicket: rsp.CreationTicket,
 	}, nil
