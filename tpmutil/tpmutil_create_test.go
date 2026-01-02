@@ -110,11 +110,7 @@ func TestCreate(t *testing.T) {
 		defer keyHandle.Close()
 
 		unsealCmd := tpm2.Unseal{
-			ItemHandle: tpm2.AuthHandle{
-				Handle: keyHandle.Handle(),
-				Name:   keyHandle.Name(),
-				Auth:   tpm2.PasswordAuth(userAuth),
-			},
+			ItemHandle: tpmutil.ToAuthHandle(keyHandle, tpm2.PasswordAuth(userAuth)),
 		}
 		unsealRsp, err := unsealCmd.Execute(thetpm)
 		if err != nil {
@@ -180,12 +176,8 @@ func TestCreate(t *testing.T) {
 			digest[i] = byte(i)
 		}
 		signCmd := tpm2.Sign{
-			KeyHandle: tpm2.AuthHandle{
-				Handle: keyHandle.Handle(),
-				Name:   keyHandle.Name(),
-				Auth:   tpm2.PasswordAuth(userAuth),
-			},
-			Digest: tpm2.TPM2BDigest{Buffer: digest},
+			KeyHandle: tpmutil.ToAuthHandle(keyHandle, tpm2.PasswordAuth(userAuth)),
+			Digest:    tpm2.TPM2BDigest{Buffer: digest},
 			InScheme: tpm2.TPMTSigScheme{
 				Scheme: tpm2.TPMAlgECDSA,
 				Details: tpm2.NewTPMUSigScheme(
@@ -210,12 +202,8 @@ func TestCreate(t *testing.T) {
 		}
 
 		wrongAuthCmd := tpm2.Sign{
-			KeyHandle: tpm2.AuthHandle{
-				Handle: keyHandle.Handle(),
-				Name:   keyHandle.Name(),
-				Auth:   tpm2.PasswordAuth([]byte("wrong-password")),
-			},
-			Digest: tpm2.TPM2BDigest{Buffer: digest},
+			KeyHandle: tpmutil.ToAuthHandle(keyHandle, tpm2.PasswordAuth([]byte("wrong-password"))),
+			Digest:    tpm2.TPM2BDigest{Buffer: digest},
 			InScheme: tpm2.TPMTSigScheme{
 				Scheme: tpm2.TPMAlgECDSA,
 				Details: tpm2.NewTPMUSigScheme(
@@ -269,11 +257,7 @@ func TestCreate(t *testing.T) {
 		defer keyHandle.Close()
 
 		unsealCmd := tpm2.Unseal{
-			ItemHandle: tpm2.AuthHandle{
-				Handle: keyHandle.Handle(),
-				Name:   keyHandle.Name(),
-				Auth:   tpm2.PasswordAuth(nil),
-			},
+			ItemHandle: tpmutil.ToAuthHandle(keyHandle),
 		}
 		unsealRsp, err := unsealCmd.Execute(thetpm)
 		if err != nil {

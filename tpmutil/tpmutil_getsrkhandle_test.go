@@ -143,10 +143,7 @@ func TestGetSKRHandle_CustomOwnerPassword(t *testing.T) {
 	// Set a custom owner hierarchy password
 	ownerPassword := []byte("custom-owner-password")
 	hierChange := tpm2.HierarchyChangeAuth{
-		AuthHandle: tpm2.AuthHandle{
-			Handle: tpm2.TPMRHOwner,
-			Auth:   tpmutil.NoAuth, // Default empty password
-		},
+		AuthHandle: tpmutil.ToAuthHandle(tpmutil.NewHandle(tpm2.TPMRHOwner), tpmutil.NoAuth), // Default empty password
 		NewAuth: tpm2.TPM2BAuth{
 			Buffer: ownerPassword,
 		},
