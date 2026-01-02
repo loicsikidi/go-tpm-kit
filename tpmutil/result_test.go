@@ -22,7 +22,7 @@ func TestCreateResult_Marshal(t *testing.T) {
 	eccTemplate := tpmutil.ECCSRKTemplate
 	parentHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHOwner,
-		Template:      eccTemplate,
+		InPublic:      eccTemplate,
 	})
 	if err != nil {
 		t.Fatalf("CreatePrimary() failed: %v", err)
@@ -32,7 +32,7 @@ func TestCreateResult_Marshal(t *testing.T) {
 	// Create a child key and get result
 	result, err := tpmutil.CreateWithResult(thetpm, tpmutil.CreateConfig{
 		ParentHandle: parentHandle,
-		Template:     eccTemplate,
+		InPublic:     eccTemplate,
 	})
 	if err != nil {
 		t.Fatalf("CreateWithResult() failed: %v", err)
@@ -89,7 +89,7 @@ func TestLoadCreateResult(t *testing.T) {
 	eccTemplate := tpmutil.ECCSRKTemplate
 	parentHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHOwner,
-		Template:      eccTemplate,
+		InPublic:      eccTemplate,
 	})
 	if err != nil {
 		t.Fatalf("CreatePrimary() failed: %v", err)
@@ -99,7 +99,7 @@ func TestLoadCreateResult(t *testing.T) {
 	// Create a child key and get result
 	originalResult, err := tpmutil.CreateWithResult(thetpm, tpmutil.CreateConfig{
 		ParentHandle: parentHandle,
-		Template:     eccTemplate,
+		InPublic:     eccTemplate,
 	})
 	if err != nil {
 		t.Fatalf("CreateWithResult() failed: %v", err)
@@ -192,7 +192,7 @@ func TestCreatePrimaryResult_Marshal(t *testing.T) {
 	eccTemplate := tpmutil.ECCSRKTemplate
 	result, closer, err := tpmutil.CreatePrimaryWithResult(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHOwner,
-		Template:      eccTemplate,
+		InPublic:      eccTemplate,
 	})
 	if err != nil {
 		t.Fatalf("CreatePrimaryWithResult() failed: %v", err)
@@ -251,7 +251,7 @@ func TestLoadCreatePrimaryResult(t *testing.T) {
 	eccTemplate := tpmutil.ECCSRKTemplate
 	originalResult, closer, err := tpmutil.CreatePrimaryWithResult(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHOwner,
-		Template:      eccTemplate,
+		InPublic:      eccTemplate,
 	})
 	if err != nil {
 		t.Fatalf("CreatePrimaryWithResult() failed: %v", err)

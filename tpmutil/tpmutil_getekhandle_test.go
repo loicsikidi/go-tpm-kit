@@ -91,7 +91,7 @@ func TestGetEKHandle_AlreadyPersisted(t *testing.T) {
 			ekHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 				PrimaryHandle: tpm2.TPMRHEndorsement,
 				Auth:          tpmutil.NoAuth,
-				Template:      tt.template,
+				InPublic:      tt.template,
 			})
 			if err != nil {
 				t.Fatalf("CreatePrimary failed: %v", err)
@@ -156,7 +156,7 @@ func TestGetEKHandle_CustomHandle(t *testing.T) {
 	ekHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHEndorsement,
 		Auth:          tpmutil.NoAuth,
-		Template:      tpmutil.RSAEKTemplate,
+		InPublic:      tpmutil.RSAEKTemplate,
 	})
 	if err != nil {
 		t.Fatalf("CreatePrimary failed: %v", err)
@@ -217,7 +217,7 @@ func TestGetEKHandle_DefaultConfig(t *testing.T) {
 	ekHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHEndorsement,
 		Auth:          tpmutil.NoAuth,
-		Template:      tpmutil.ECCEKTemplate,
+		InPublic:      tpmutil.ECCEKTemplate,
 	})
 	if err != nil {
 		t.Fatalf("CreatePrimary failed: %v", err)

@@ -123,7 +123,7 @@ func TestPersistEK_WithTransientKey(t *testing.T) {
 	// Create a transient EK manually
 	transientEK, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHEndorsement,
-		Template:      tpmutil.RSAEKTemplate,
+		InPublic:      tpmutil.RSAEKTemplate,
 	})
 	if err != nil {
 		t.Fatalf("CreatePrimary failed: %v", err)
