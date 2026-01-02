@@ -100,10 +100,7 @@ func TestGetEKHandle_AlreadyPersisted(t *testing.T) {
 
 			// Persist it at the expected handle
 			_, err = tpm2.EvictControl{
-				Auth: tpm2.AuthHandle{
-					Handle: tpm2.TPMRHOwner,
-					Auth:   tpmutil.NoAuth,
-				},
+				Auth:             tpmutil.ToAuthHandle(tpmutil.NewHandle(tpm2.TPMRHOwner), tpmutil.NoAuth),
 				ObjectHandle:     ekHandle,
 				PersistentHandle: tt.expectedHandle,
 			}.Execute(thetpm)
@@ -168,10 +165,7 @@ func TestGetEKHandle_CustomHandle(t *testing.T) {
 
 	// Persist it at the custom handle
 	_, err = tpm2.EvictControl{
-		Auth: tpm2.AuthHandle{
-			Handle: tpm2.TPMRHOwner,
-			Auth:   tpmutil.NoAuth,
-		},
+		Auth:             tpmutil.ToAuthHandle(tpmutil.NewHandle(tpm2.TPMRHOwner), tpmutil.NoAuth),
 		ObjectHandle:     ekHandle,
 		PersistentHandle: customHandle,
 	}.Execute(thetpm)
@@ -232,10 +226,7 @@ func TestGetEKHandle_DefaultConfig(t *testing.T) {
 
 	// Persist it at the default RSA EK handle
 	_, err = tpm2.EvictControl{
-		Auth: tpm2.AuthHandle{
-			Handle: tpm2.TPMRHOwner,
-			Auth:   tpmutil.NoAuth,
-		},
+		Auth:             tpmutil.ToAuthHandle(tpmutil.NewHandle(tpm2.TPMRHOwner), tpmutil.NoAuth),
 		ObjectHandle:     ekHandle,
 		PersistentHandle: tpmutil.ECCEKHandle,
 	}.Execute(thetpm)

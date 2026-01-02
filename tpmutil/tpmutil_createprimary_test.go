@@ -8,6 +8,45 @@ import (
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
+var (
+	eccSigningTemplate = tpm2.TPMTPublic{
+		Type:    tpm2.TPMAlgECC,
+		NameAlg: tpm2.TPMAlgSHA256,
+		ObjectAttributes: tpm2.TPMAObject{
+			SignEncrypt:         true,
+			FixedTPM:            true,
+			FixedParent:         true,
+			SensitiveDataOrigin: true,
+			UserWithAuth:        true,
+		},
+		Parameters: tpm2.NewTPMUPublicParms(
+			tpm2.TPMAlgECC,
+			&tpm2.TPMSECCParms{
+				Scheme: tpm2.TPMTECCScheme{
+					Scheme: tpm2.TPMAlgECDSA,
+					Details: tpm2.NewTPMUAsymScheme(
+						tpm2.TPMAlgECDSA,
+						&tpm2.TPMSSigSchemeECDSA{
+							HashAlg: tpm2.TPMAlgSHA256,
+						},
+					),
+				},
+				CurveID: tpm2.TPMECCNistP256,
+			},
+		),
+	}
+
+	keyedHashTemplate = tpm2.TPMTPublic{
+		Type:    tpm2.TPMAlgKeyedHash,
+		NameAlg: tpm2.TPMAlgSHA256,
+		ObjectAttributes: tpm2.TPMAObject{
+			FixedTPM:     true,
+			FixedParent:  true,
+			UserWithAuth: true,
+		},
+	}
+)
+
 func TestCreatePrimaryWithConfig(t *testing.T) {
 	thetpm, err := simulator.OpenSimulator()
 	if err != nil {
@@ -78,6 +117,159 @@ func TestCreatePrimaryWithConfig(t *testing.T) {
 
 		if public.Type != tpm2.TPMAlgRSA {
 			t.Errorf("Expected public type RSA, got %v", public.Type)
+		}
+	})
+
+	t.Run("with UserAuth", func(t *testing.T) {
+		userAuth := []byte("my-secret-password")
+
+		handle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
+			PrimaryHandle: tpm2.TPMRHOwner,
+			Template:      eccSigningTemplate,
+			UserAuth:      userAuth,
+		})
+		if err != nil {
+			t.Fatalf("CreatePrimary() with UserAuth failed: %v", err)
+		}
+		defer func() {
+			if err := handle.Close(); err != nil {
+				t.Errorf("Close() failed: %v", err)
+			}
+		}()
+
+		if handle.Type() != tpmutil.TransientHandle {
+			t.Errorf("Expected handle type Transient, got %s", handle.Type())
+		}
+
+		// Test signing with correct auth
+		digest := make([]byte, 32)
+		for i := range digest {
+			digest[i] = byte(i)
+		}
+		signCmd := tpm2.Sign{
+			KeyHandle: tpmutil.ToAuthHandle(handle, tpm2.PasswordAuth(userAuth)),
+			Digest:    tpm2.TPM2BDigest{Buffer: digest},
+			InScheme: tpm2.TPMTSigScheme{
+				Scheme: tpm2.TPMAlgECDSA,
+				Details: tpm2.NewTPMUSigScheme(
+					tpm2.TPMAlgECDSA,
+					&tpm2.TPMSSchemeHash{
+						HashAlg: tpm2.TPMAlgSHA256,
+					},
+				),
+			},
+			Validation: tpm2.TPMTTKHashCheck{
+				Tag: tpm2.TPMSTHashCheck,
+			},
+		}
+
+		signRsp, err := signCmd.Execute(thetpm)
+		if err != nil {
+			t.Fatalf("Sign() failed: %v", err)
+		}
+
+		if signRsp.Signature.SigAlg != tpm2.TPMAlgECDSA {
+			t.Errorf("Expected signature algorithm ECDSA, got %v", signRsp.Signature.SigAlg)
+		}
+
+		// Test signing with wrong auth should fail
+		wrongAuthCmd := tpm2.Sign{
+			KeyHandle: tpmutil.ToAuthHandle(handle, tpm2.PasswordAuth([]byte("wrong-password"))),
+			Digest:    tpm2.TPM2BDigest{Buffer: digest},
+			InScheme: tpm2.TPMTSigScheme{
+				Scheme: tpm2.TPMAlgECDSA,
+				Details: tpm2.NewTPMUSigScheme(
+					tpm2.TPMAlgECDSA,
+					&tpm2.TPMSSchemeHash{
+						HashAlg: tpm2.TPMAlgSHA256,
+					},
+				),
+			},
+			Validation: tpm2.TPMTTKHashCheck{
+				Tag: tpm2.TPMSTHashCheck,
+			},
+		}
+
+		_, err = wrongAuthCmd.Execute(thetpm)
+		if err == nil {
+			t.Error("Expected Sign() to fail with wrong password")
+		}
+	})
+
+	t.Run("with SealingData", func(t *testing.T) {
+		sealingData := []byte("secret sealed data")
+
+		handle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
+			PrimaryHandle: tpm2.TPMRHOwner,
+			Template:      keyedHashTemplate,
+			SealingData:   sealingData,
+		})
+		if err != nil {
+			t.Fatalf("CreatePrimary() with SealingData failed: %v", err)
+		}
+		defer func() {
+			if err := handle.Close(); err != nil {
+				t.Errorf("Close() failed: %v", err)
+			}
+		}()
+
+		if handle.Type() != tpmutil.TransientHandle {
+			t.Errorf("Expected handle type Transient, got %s", handle.Type())
+		}
+
+		public := handle.Public()
+		if public.Type != tpm2.TPMAlgKeyedHash {
+			t.Errorf("Expected public type KeyedHash, got %v", public.Type)
+		}
+
+		// Test unsealing the data
+		unsealCmd := tpm2.Unseal{
+			ItemHandle: tpmutil.ToAuthHandle(handle),
+		}
+		unsealRsp, err := unsealCmd.Execute(thetpm)
+		if err != nil {
+			t.Fatalf("Unseal() failed: %v", err)
+		}
+
+		if string(unsealRsp.OutData.Buffer) != string(sealingData) {
+			t.Errorf("Expected unsealed data %q, got %q", sealingData, unsealRsp.OutData.Buffer)
+		}
+	})
+
+	t.Run("with both UserAuth and SealingData", func(t *testing.T) {
+		userAuth := []byte("my-password")
+		sealingData := []byte("secret sealed data")
+
+		handle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
+			PrimaryHandle: tpm2.TPMRHOwner,
+			Template:      keyedHashTemplate,
+			UserAuth:      userAuth,
+			SealingData:   sealingData,
+		})
+		if err != nil {
+			t.Fatalf("CreatePrimary() with UserAuth and SealingData failed: %v", err)
+		}
+		defer func() {
+			if err := handle.Close(); err != nil {
+				t.Errorf("Close() failed: %v", err)
+			}
+		}()
+
+		if handle.Type() != tpmutil.TransientHandle {
+			t.Errorf("Expected handle type Transient, got %s", handle.Type())
+		}
+
+		// Test unsealing with correct auth
+		unsealCmd := tpm2.Unseal{
+			ItemHandle: tpmutil.ToAuthHandle(handle, tpm2.PasswordAuth(userAuth)),
+		}
+		unsealRsp, err := unsealCmd.Execute(thetpm)
+		if err != nil {
+			t.Fatalf("Unseal() failed: %v", err)
+		}
+
+		if string(unsealRsp.OutData.Buffer) != string(sealingData) {
+			t.Errorf("Expected unsealed data %q, got %q", sealingData, unsealRsp.OutData.Buffer)
 		}
 	})
 
@@ -182,6 +374,57 @@ func TestCreatePrimaryConfig_CheckAndSetDefault(t *testing.T) {
 			t.Errorf("Expected PrimaryHandle TPMRHEndorsement, got 0x%x", cfg.PrimaryHandle)
 		}
 	})
+
+	t.Run("sealing data validation - invalid template type", func(t *testing.T) {
+		eccTemplate := tpmutil.ECCSRKTemplate
+		cfg := tpmutil.CreatePrimaryConfig{
+			Template:    eccTemplate,
+			SealingData: []byte("secret data"),
+		}
+
+		err := cfg.CheckAndSetDefault()
+		if err == nil {
+			t.Error("Expected error when SealingData is provided with non-KeyedHash template, got nil")
+		}
+	})
+
+	t.Run("sealing data validation - SensitiveDataOrigin set", func(t *testing.T) {
+		template := tpm2.TPMTPublic{
+			Type:    tpm2.TPMAlgKeyedHash,
+			NameAlg: tpm2.TPMAlgSHA256,
+			ObjectAttributes: tpm2.TPMAObject{
+				SensitiveDataOrigin: true,
+			},
+		}
+		cfg := tpmutil.CreatePrimaryConfig{
+			Template:    template,
+			SealingData: []byte("secret data"),
+		}
+
+		err := cfg.CheckAndSetDefault()
+		if err == nil {
+			t.Error("Expected error when SealingData is provided with SensitiveDataOrigin set, got nil")
+		}
+	})
+
+	t.Run("sealing data validation - valid", func(t *testing.T) {
+		template := tpm2.TPMTPublic{
+			Type:    tpm2.TPMAlgKeyedHash,
+			NameAlg: tpm2.TPMAlgSHA256,
+			ObjectAttributes: tpm2.TPMAObject{
+				SensitiveDataOrigin: false,
+			},
+		}
+		cfg := tpmutil.CreatePrimaryConfig{
+			Template:    template,
+			SealingData: []byte("secret data"),
+		}
+
+		err := cfg.CheckAndSetDefault()
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	})
 }
 
 func TestLoadWithConfig(t *testing.T) {
@@ -205,12 +448,8 @@ func TestLoadWithConfig(t *testing.T) {
 
 		// Create a child key
 		create := tpm2.Create{
-			ParentHandle: tpm2.AuthHandle{
-				Handle: primaryHandle.Handle(),
-				Name:   primaryHandle.Name(),
-				Auth:   tpm2.PasswordAuth(nil),
-			},
-			InPublic: tpm2.New2B(tpmutil.ECCSRKTemplate),
+			ParentHandle: tpmutil.ToAuthHandle(primaryHandle),
+			InPublic:     tpm2.New2B(tpmutil.ECCSRKTemplate),
 		}
 		createRsp, err := create.Execute(thetpm)
 		if err != nil {

@@ -11,11 +11,7 @@ import (
 // Example:
 //
 //	activateRsp, err := tpm2.ActivateCredential{
-//		KeyHandle: tpm2.AuthHandle{
-//			Handle: ekHandle.Handle(),
-//			Name:   ekHandle.Name(),
-//			Auth:   tpm2.Policy(tpm2.TPMAlgSHA256, 16, tpmutil.EkPolicyCallback),
-//		},
+//		KeyHandle: tpmutil.ToAuthHandle(ekHandle, tpm2.Policy(tpm2.TPMAlgSHA256, 16, tpmutil.EkPolicyCallback)),
 //		truncated...
 //	}.Execute(tpm)
 func EkPolicyCallback(t transport.TPM, handle tpm2.TPMISHPolicy, nonceTPM tpm2.TPM2BNonce) error {

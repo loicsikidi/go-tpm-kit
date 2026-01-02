@@ -286,6 +286,18 @@ type CreatePrimaryConfig struct {
 	//
 	// Default: [NoAuth].
 	Auth tpm2.Session
+	// UserAuth is the user authorization value for the created primary object.
+	//
+	// Default: nil.
+	UserAuth []byte
+	// SealingData is the sensitive data associated with the created primary object.
+	//
+	// This field can be provided when you want to seal data with the created primary object.
+	//
+	// Note: this field is accepted if the Template is of type [tpm2.TPMAlgKeyedHash].
+	//
+	// Default: nil.
+	SealingData []byte
 }
 
 // CheckAndSetDefault validates and sets default values for CreatePrimaryConfig.
@@ -295,6 +307,14 @@ func (c *CreatePrimaryConfig) CheckAndSetDefault() error {
 	}
 	if c.Auth == nil {
 		c.Auth = NoAuth
+	}
+	if len(c.SealingData) > 0 {
+		if c.Template.Type != tpm2.TPMAlgKeyedHash {
+			return fmt.Errorf("invalid input: SealingData can only be provided if Template.Type is TPMAlgKeyedHash")
+		}
+		if c.Template.ObjectAttributes.SensitiveDataOrigin {
+			return fmt.Errorf("invalid input: SealingData cannot be provided if Template.ObjectAttributes.SensitiveDataOrigin is set")
+		}
 	}
 	return nil
 }

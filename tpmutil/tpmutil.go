@@ -78,10 +78,7 @@ func nvRead(t transport.TPM, hierarchy, index tpm2.TPMHandle, auth tpm2.Session,
 		}
 
 		readRsp, err := tpm2.NVRead{
-			AuthHandle: tpm2.AuthHandle{
-				Handle: hierarchy,
-				Auth:   auth,
-			},
+			AuthHandle: ToAuthHandle(NewHandle(hierarchy), auth),
 			NVIndex: tpm2.NamedHandle{
 				Handle: index,
 				Name:   readPubRsp.NVName,
@@ -134,10 +131,7 @@ func nvWrite(t transport.TPM, hierarchy, index tpm2.TPMHandle, auth tpm2.Session
 	}
 
 	defs := tpm2.NVDefineSpace{
-		AuthHandle: tpm2.AuthHandle{
-			Handle: hierarchy,
-			Auth:   auth,
-		},
+		AuthHandle: ToAuthHandle(NewHandle(hierarchy), auth),
 		PublicInfo: tpm2.New2B(
 			tpm2.TPMSNVPublic{
 				NVIndex:    index,
@@ -165,10 +159,7 @@ func nvWrite(t transport.TPM, hierarchy, index tpm2.TPMHandle, auth tpm2.Session
 		end := min(int(offset+maxBufferSize), len(data))
 
 		write := tpm2.NVWrite{
-			AuthHandle: tpm2.AuthHandle{
-				Handle: hierarchy,
-				Auth:   auth,
-			},
+			AuthHandle: ToAuthHandle(NewHandle(hierarchy), auth),
 			NVIndex: tpm2.NamedHandle{
 				Handle: pub.NVIndex,
 				Name:   *nvName,
@@ -247,13 +238,12 @@ func hash(t transport.TPM, hierarchy tpm2.TPMHandle, password string, blockSize 
 		return nil, nilTicket, fmt.Errorf("HashSequenceStart failed: %w", err)
 	}
 
-	authHandle := tpm2.AuthHandle{
+	authHandle := ToAuthHandle(NewHandle(&tpm2.NamedHandle{
 		Handle: rspHSS.SequenceHandle,
 		Name: tpm2.TPM2BName{
 			Buffer: auth,
 		},
-		Auth: tpm2.PasswordAuth(auth),
-	}
+	}), tpm2.PasswordAuth(auth))
 
 	for len(data) > blockSize {
 		sequenceUpdate := tpm2.SequenceUpdate{
@@ -433,10 +423,7 @@ func GetSKRHandle(t transport.TPM, optionalCfg ...ParentConfig) (Handle, error) 
 
 	// Make the SRK persistent at the desired handle.
 	_, err = tpm2.EvictControl{
-		Auth: tpm2.AuthHandle{
-			Handle: cfg.Hierarchy,
-			Auth:   cfg.Auth,
-		},
+		Auth:             ToAuthHandle(NewHandle(cfg.Hierarchy), cfg.Auth),
 		ObjectHandle:     srkHandle,
 		PersistentHandle: cfg.Handle.Handle(),
 	}.Execute(t)
@@ -551,10 +538,7 @@ func PersistEK(t transport.TPM, optionalCfg ...EKParentConfig) (Handle, error) {
 
 		// Remove the existing key
 		_, evictErr := tpm2.EvictControl{
-			Auth: tpm2.AuthHandle{
-				Handle: tpm2.TPMRHOwner,
-				Auth:   NoAuth,
-			},
+			Auth:             ToAuthHandle(NewHandle(tpm2.TPMRHOwner), NoAuth),
 			ObjectHandle:     existingHandle,
 			PersistentHandle: cfg.Handle.Handle(),
 		}.Execute(t)
@@ -591,10 +575,7 @@ func PersistEK(t transport.TPM, optionalCfg ...EKParentConfig) (Handle, error) {
 	}
 
 	_, err = tpm2.EvictControl{
-		Auth: tpm2.AuthHandle{
-			Handle: tpm2.TPMRHOwner,
-			Auth:   NoAuth,
-		},
+		Auth: ToAuthHandle(NewHandle(tpm2.TPMRHOwner), NoAuth),
 		ObjectHandle: &tpm2.NamedHandle{
 			Handle: transientHandle,
 			Name:   name,
@@ -675,11 +656,9 @@ func CreatePrimaryWithResult(t transport.TPM, optionalCfg ...CreatePrimaryConfig
 	}
 
 	cmd := tpm2.CreatePrimary{
-		PrimaryHandle: tpm2.AuthHandle{
-			Handle: cfg.PrimaryHandle,
-			Auth:   cfg.Auth,
-		},
-		InPublic: tpm2.New2B(cfg.Template),
+		PrimaryHandle: ToAuthHandle(NewHandle(cfg.PrimaryHandle), cfg.Auth),
+		InSensitive:   toTPM2BSensitiveCreate(cfg.UserAuth, cfg.SealingData),
+		InPublic:      tpm2.New2B(cfg.Template),
 	}
 
 	rsp, err := cmd.Execute(t)
@@ -725,13 +704,9 @@ func Load(t transport.TPM, optionalCfg ...LoadConfig) (HandleCloser, error) {
 	}
 
 	cmd := tpm2.Load{
-		ParentHandle: tpm2.AuthHandle{
-			Handle: cfg.ParentHandle.Handle(),
-			Name:   cfg.ParentHandle.Name(),
-			Auth:   cfg.Auth,
-		},
-		InPrivate: cfg.InPrivate,
-		InPublic:  cfg.InPublic,
+		ParentHandle: ToAuthHandle(cfg.ParentHandle, cfg.Auth),
+		InPrivate:    cfg.InPrivate,
+		InPublic:     cfg.InPublic,
 	}
 
 	rsp, err := cmd.Execute(t)
@@ -843,13 +818,9 @@ func CreateWithResult(t transport.TPM, optionalCfg ...CreateConfig) (*CreateResu
 	}
 
 	cmd := tpm2.Create{
-		ParentHandle: tpm2.AuthHandle{
-			Handle: cfg.ParentHandle.Handle(),
-			Name:   cfg.ParentHandle.Name(),
-			Auth:   cfg.ParentAuth,
-		},
-		InSensitive: toTPM2BSensitiveCreate(cfg.UserAuth, cfg.SealingData),
-		InPublic:    tpm2.New2B(cfg.Template),
+		ParentHandle: ToAuthHandle(cfg.ParentHandle, cfg.ParentAuth),
+		InSensitive:  toTPM2BSensitiveCreate(cfg.UserAuth, cfg.SealingData),
+		InPublic:     tpm2.New2B(cfg.Template),
 	}
 
 	rsp, err := cmd.Execute(t)

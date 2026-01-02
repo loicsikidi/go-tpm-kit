@@ -173,6 +173,20 @@ func (h *tpmHandle) Close() error {
 	return err
 }
 
+func (h *tpmHandle) toAuthHandle() tpm2.AuthHandle {
+	if authHandle, ok := h.handle.(*tpm2.AuthHandle); ok {
+		return *authHandle
+	}
+	if authHandle, ok := h.handle.(tpm2.AuthHandle); ok {
+		return authHandle
+	}
+	return tpm2.AuthHandle{
+		Handle: h.Handle(),
+		Name:   h.Name(),
+		Auth:   NoAuth,
+	}
+}
+
 // IsHandleOfType checks if the given handle is of the specified type.
 //
 // Example:
@@ -225,14 +239,24 @@ func ToHandle(t transport.TPM, handle any) (Handle, error) {
 
 // ToAuthHandle converts a Handle to an authorization Handle with the given session.
 //
+// This function is a hack in order to deals with Authorization Handles because
+// internally go-tpm is able to interpret Authz only as [tpm2.AuthHandle].
+//
 // Note: if no session is provided, NoAuth is used by default.
-func ToAuthHandle(h Handle, optionalAuth ...tpm2.Session) Handle {
+//
+// EXPERIMENTAL: this function may change or be removed in future releases.
+func ToAuthHandle(h Handle, optionalAuth ...tpm2.Session) tpm2.AuthHandle {
+	if h.IsAuth() && len(optionalAuth) == 0 {
+		if th, ok := h.(*tpmHandle); ok {
+			return th.toAuthHandle()
+		}
+	}
 	auth := utils.OptionalArgWithDefault(optionalAuth, NoAuth)
-	return NewHandle(&tpm2.AuthHandle{
+	return tpm2.AuthHandle{
 		Handle: h.Handle(),
 		Name:   h.Name(),
 		Auth:   auth,
-	})
+	}
 }
 
 // isAuthHandle checks if the given handle is an authorization handle.
