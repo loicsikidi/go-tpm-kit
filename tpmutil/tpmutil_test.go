@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
-	"io"
 	"reflect"
 	"testing"
 
@@ -17,14 +16,6 @@ import (
 	"github.com/loicsikidi/go-tpm-kit/tpmcrypto"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
-
-func genRandomBytes(length int) []byte {
-	b := make([]byte, length)
-	if _, err := io.ReadFull(rand.Reader, b); err != nil {
-		panic(err)
-	}
-	return b
-}
 
 func TestNVWrite(t *testing.T) {
 	thetpm, err := simulator.OpenSimulator()
@@ -48,7 +39,7 @@ func TestNVWrite(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			data := genRandomBytes(tt.payloadSize)
+			data := tpmutil.MustGenerateIV(tt.payloadSize)
 
 			cfg := tpmutil.NVWriteConfig{
 				Index: index,
@@ -415,5 +406,317 @@ func TestNVRead(t *testing.T) {
 
 	if len(readData) != 9 {
 		t.Errorf("Expected to read 9 bytes, got %d", len(readData))
+	}
+}
+
+func TestGenerateIV(t *testing.T) {
+	tests := []struct {
+		name      string
+		blockSize int
+		wantErr   bool
+	}{
+		{
+			name:      "valid AES block size (16 bytes)",
+			blockSize: 16,
+			wantErr:   false,
+		},
+		{
+			name:      "valid custom block size (32 bytes)",
+			blockSize: 32,
+			wantErr:   false,
+		},
+		{
+			name:      "valid small block size (8 bytes)",
+			blockSize: 8,
+			wantErr:   false,
+		},
+		{
+			name:      "invalid zero block size",
+			blockSize: 0,
+			wantErr:   true,
+		},
+		{
+			name:      "invalid negative block size",
+			blockSize: -1,
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			iv, err := tpmutil.GenerateIV(tt.blockSize)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GenerateIV() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr {
+				if len(iv) != tt.blockSize {
+					t.Errorf("GenerateIV() returned IV of length %d, want %d", len(iv), tt.blockSize)
+				}
+			}
+		})
+	}
+}
+
+func TestMustGenerateIV(t *testing.T) {
+	tests := []struct {
+		name        string
+		blockSize   int
+		shouldPanic bool
+	}{
+		{
+			name:        "valid block size",
+			blockSize:   16,
+			shouldPanic: false,
+		},
+		{
+			name:        "invalid zero block size",
+			blockSize:   0,
+			shouldPanic: true,
+		},
+		{
+			name:        "invalid negative block size",
+			blockSize:   -1,
+			shouldPanic: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer func() {
+				r := recover()
+				if (r != nil) != tt.shouldPanic {
+					t.Errorf("tpmutil.MustGenerateIV() panic = %v, shouldPanic %v", r != nil, tt.shouldPanic)
+				}
+			}()
+
+			iv := tpmutil.MustGenerateIV(tt.blockSize)
+			if !tt.shouldPanic && len(iv) != tt.blockSize {
+				t.Errorf("tpmutil.MustGenerateIV() returned IV of length %d, want %d", len(iv), tt.blockSize)
+			}
+		})
+	}
+}
+
+func TestSymEncryptDecrypt(t *testing.T) {
+	thetpm, err := simulator.OpenSimulator()
+	if err != nil {
+		t.Fatalf("Failed to open simulator: %v", err)
+	}
+	defer thetpm.Close()
+
+	primary, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
+		PrimaryHandle: tpm2.TPMRHOwner,
+		InPublic: tpm2.TPMTPublic{
+			Type:    tpm2.TPMAlgSymCipher,
+			NameAlg: tpm2.TPMAlgSHA256,
+			ObjectAttributes: tpm2.TPMAObject{
+				FixedTPM:            true,
+				FixedParent:         true,
+				UserWithAuth:        true,
+				SensitiveDataOrigin: true,
+				Decrypt:             true,
+				SignEncrypt:         true,
+			},
+			Parameters: tpm2.NewTPMUPublicParms(
+				tpm2.TPMAlgSymCipher,
+				&tpm2.TPMSSymCipherParms{
+					Sym: tpm2.TPMTSymDefObject{
+						Algorithm: tpm2.TPMAlgAES,
+						Mode:      tpm2.NewTPMUSymMode(tpm2.TPMAlgAES, tpm2.TPMAlgCFB),
+						KeyBits: tpm2.NewTPMUSymKeyBits(
+							tpm2.TPMAlgAES,
+							tpm2.TPMKeyBits(128),
+						),
+					},
+				},
+			),
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreatePrimary() failed: %v", err)
+	}
+	defer primary.Close()
+
+	tests := []struct {
+		name      string
+		dataSize  int
+		blockSize int
+	}{
+		{
+			name:     "small message",
+			dataSize: 6,
+		},
+		{
+			name:     "medium message",
+			dataSize: 512,
+		},
+		{
+			name:     "size below max buffer",
+			dataSize: tpmkit.MaxBufferSize - 1,
+		},
+		{
+			name:     "size equals max buffer",
+			dataSize: tpmkit.MaxBufferSize,
+		},
+		{
+			name:     "size above max buffer",
+			dataSize: tpmkit.MaxBufferSize + 1,
+		},
+		{
+			name:     "double max buffer size",
+			dataSize: tpmkit.MaxBufferSize * 2,
+		},
+		{
+			name:     "large message",
+			dataSize: tpmkit.MaxBufferSize*2 + 100,
+		},
+		{
+			name:     "2KB message",
+			dataSize: 2048,
+		},
+		{
+			name:      "custom block size",
+			dataSize:  2048,
+			blockSize: 512,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			message := tpmutil.MustGenerateIV(tt.dataSize)
+			iv := tpmutil.MustGenerateIV(16)
+
+			encryptCfg := tpmutil.SymEncryptDecryptConfig{
+				KeyHandle: primary,
+				Data:      message,
+				IV:        iv,
+				Mode:      tpm2.TPMAlgCFB,
+				Decrypt:   false,
+			}
+			if tt.blockSize > 0 {
+				encryptCfg.BlockSize = tt.blockSize
+			}
+
+			encrypted, err := tpmutil.SymEncryptDecrypt(thetpm, encryptCfg)
+			if err != nil {
+				t.Fatalf("SymEncryptDecrypt() encrypt failed: %v", err)
+			}
+
+			if bytes.Equal(message, encrypted) {
+				t.Error("Encrypted data should differ from original")
+			}
+
+			decryptCfg := tpmutil.SymEncryptDecryptConfig{
+				KeyHandle: primary,
+				Data:      encrypted,
+				IV:        iv,
+				Mode:      tpm2.TPMAlgCFB,
+				Decrypt:   true,
+			}
+			if tt.blockSize > 0 {
+				decryptCfg.BlockSize = tt.blockSize
+			}
+
+			decrypted, err := tpmutil.SymEncryptDecrypt(thetpm, decryptCfg)
+			if err != nil {
+				t.Fatalf("SymEncryptDecrypt() decrypt failed: %v", err)
+			}
+
+			if !bytes.Equal(message, decrypted) {
+				t.Errorf("Decrypted data doesn't match original (size=%d, blockSize=%d)", tt.dataSize, tt.blockSize)
+			}
+		})
+	}
+}
+
+func TestSymEncryptDecryptValidation(t *testing.T) {
+	thetpm, err := simulator.OpenSimulator()
+	if err != nil {
+		t.Fatalf("Failed to open simulator: %v", err)
+	}
+	defer thetpm.Close()
+
+	primary, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
+		PrimaryHandle: tpm2.TPMRHOwner,
+		InPublic: tpm2.TPMTPublic{
+			Type:    tpm2.TPMAlgSymCipher,
+			NameAlg: tpm2.TPMAlgSHA256,
+			ObjectAttributes: tpm2.TPMAObject{
+				FixedTPM:            true,
+				FixedParent:         true,
+				UserWithAuth:        true,
+				SensitiveDataOrigin: true,
+				Decrypt:             true,
+				SignEncrypt:         true,
+			},
+			Parameters: tpm2.NewTPMUPublicParms(
+				tpm2.TPMAlgSymCipher,
+				&tpm2.TPMSSymCipherParms{
+					Sym: tpm2.TPMTSymDefObject{
+						Algorithm: tpm2.TPMAlgAES,
+						Mode:      tpm2.NewTPMUSymMode(tpm2.TPMAlgAES, tpm2.TPMAlgCFB),
+						KeyBits: tpm2.NewTPMUSymKeyBits(
+							tpm2.TPMAlgAES,
+							tpm2.TPMKeyBits(128),
+						),
+					},
+				},
+			),
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreatePrimary() failed: %v", err)
+	}
+	defer primary.Close()
+
+	tests := []struct {
+		name    string
+		cfg     tpmutil.SymEncryptDecryptConfig
+		wantErr bool
+	}{
+		{
+			name: "missing handle",
+			cfg: tpmutil.SymEncryptDecryptConfig{
+				Data: []byte("data"),
+				IV:   tpmutil.MustGenerateIV(16),
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing data",
+			cfg: tpmutil.SymEncryptDecryptConfig{
+				KeyHandle: primary,
+				IV:        tpmutil.MustGenerateIV(16),
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing IV",
+			cfg: tpmutil.SymEncryptDecryptConfig{
+				KeyHandle: primary,
+				Data:      []byte("data"),
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid block size",
+			cfg: tpmutil.SymEncryptDecryptConfig{
+				KeyHandle: primary,
+				Data:      []byte("data"),
+				IV:        tpmutil.MustGenerateIV(16),
+				BlockSize: -1,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := tpmutil.SymEncryptDecrypt(thetpm, tt.cfg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SymEncryptDecrypt() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }

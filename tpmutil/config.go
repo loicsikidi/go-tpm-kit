@@ -399,3 +399,61 @@ func (c *LoadConfig) CheckAndSetDefault() error {
 	}
 	return nil
 }
+
+// SymEncryptDecryptConfig holds configuration for TPM symmetric encryption/decryption operations.
+type SymEncryptDecryptConfig struct {
+	// KeyHandle is the handle to the symmetric key.
+	//
+	// Required.
+	KeyHandle Handle
+	// Auth is the authorization session for the key.
+	//
+	// Default: [NoAuth].
+	Auth tpm2.Session
+	// Data to encrypt or decrypt.
+	//
+	// Required.
+	Data []byte
+	// IV is the initialization vector.
+	//
+	// Required.
+	IV []byte
+	// Mode specifies the symmetric mode to use.
+	//
+	// Default: [tpm2.TPMAlgCFB].
+	Mode tpm2.TPMAlgID
+	// Decrypt indicates whether to decrypt (true) or encrypt (false).
+	//
+	// Default: false (encrypt).
+	Decrypt bool
+	// BlockSize for paginated operations.
+	//
+	// Default: maxBufferSize (1024 bytes).
+	BlockSize int
+}
+
+// CheckAndSetDefault validates and sets default values for SymEncryptDecryptConfig.
+func (c *SymEncryptDecryptConfig) CheckAndSetDefault() error {
+	if c.KeyHandle == nil {
+		return ErrMissingHandle
+	}
+	if len(c.Data) == 0 {
+		return ErrMissingData
+	}
+	if len(c.IV) == 0 {
+		return fmt.Errorf("invalid input: IV is required")
+	}
+	if c.Auth == nil {
+		c.Auth = NoAuth
+	}
+	if c.Mode == 0 {
+		c.Mode = tpm2.TPMAlgCFB
+	}
+	if c.BlockSize < 0 {
+		return ErrInvalidBlockSize
+	}
+	if c.BlockSize == 0 || c.BlockSize > maxBufferSize {
+		c.BlockSize = maxBufferSize
+	}
+	return nil
+}
