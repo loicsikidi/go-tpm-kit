@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/google/go-tpm/tpm2/transport/simulator"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
@@ -48,11 +48,7 @@ var (
 )
 
 func TestCreatePrimaryWithConfig(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	t.Run("with ECC template", func(t *testing.T) {
 		eccTemplate := tpmutil.ECCSRKTemplate
@@ -276,11 +272,7 @@ func TestCreatePrimaryWithConfig(t *testing.T) {
 }
 
 func TestCreatePrimaryWithResponseAndConfig(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	t.Run("with ECC template", func(t *testing.T) {
 		eccTemplate := tpmutil.ECCSRKTemplate
@@ -428,11 +420,7 @@ func TestCreatePrimaryConfig_CheckAndSetDefault(t *testing.T) {
 }
 
 func TestLoadWithConfig(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	t.Run("load child key", func(t *testing.T) {
 		// First create a primary key

@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/google/go-tpm/tpm2/transport/simulator"
 	tpmkit "github.com/loicsikidi/go-tpm-kit"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 )
 
 func TestHandleType_String(t *testing.T) {
@@ -182,11 +182,7 @@ func TestNewHandle(t *testing.T) {
 }
 
 func TestNewHandleCloser(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open TPM simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	createPrimary := tpm2.CreatePrimary{
 		PrimaryHandle: tpm2.TPMRHOwner,
@@ -271,11 +267,7 @@ func TestIsAuthHandle(t *testing.T) {
 }
 
 func TestAsHandle(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open TPM simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	t.Run("from TPMHandle", func(t *testing.T) {
 		// Create a primary key to get a valid handle
@@ -419,11 +411,7 @@ func TestTpmHandleMethods(t *testing.T) {
 	})
 
 	t.Run("Public() method - with public", func(t *testing.T) {
-		thetpm, err := simulator.OpenSimulator()
-		if err != nil {
-			t.Fatalf("Failed to open TPM simulator: %v", err)
-		}
-		defer thetpm.Close()
+		thetpm := testutil.OpenSimulator(t)
 
 		createPrimary := tpm2.CreatePrimary{
 			PrimaryHandle: tpm2.TPMRHOwner,

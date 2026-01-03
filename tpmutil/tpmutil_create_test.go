@@ -4,16 +4,12 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/google/go-tpm/tpm2/transport/simulator"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
 func TestCreate(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	t.Run("with ECC template", func(t *testing.T) {
 		eccTemplate := tpmutil.ECCSRKTemplate
@@ -313,11 +309,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestCreateWithResult(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	t.Run("with ECC template", func(t *testing.T) {
 		// First create a primary key to use as parent

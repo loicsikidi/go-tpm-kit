@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
-	"github.com/google/go-tpm/tpm2/transport/simulator"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 	"github.com/loicsikidi/go-tpm-kit/tpmsession"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
@@ -29,23 +29,6 @@ func setTestAuthProvider(authValue []byte, returnErr error) func() {
 		}
 		tpmsession.PromptAuthValue.Store(&defaultPrompt)
 	}
-}
-
-// setupTPM creates a TPM simulator and returns it along with a cleanup function.
-func setupTPM(t *testing.T) (transport.TPMCloser, func()) {
-	t.Helper()
-	tpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("failed to open TPM simulator: %v", err)
-	}
-
-	cleanup := func() {
-		if err := tpm.Close(); err != nil {
-			t.Errorf("failed to close TPM simulator: %v", err)
-		}
-	}
-
-	return tpm, cleanup
 }
 
 // getSRK gets or creates a persistent Storage Root Key for testing.
@@ -158,8 +141,7 @@ func createSealedObject(t *testing.T, tpm transport.TPM, handle tpm2.TPMHandle, 
 }
 
 func TestAuthProvider_ErrorHandling(t *testing.T) {
-	tpm, cleanup := setupTPM(t)
-	defer cleanup()
+	tpm := testutil.OpenSimulator(t)
 
 	// Create sealed object
 	getSRK(t, tpm, 0x81000001)
@@ -188,8 +170,7 @@ func TestAuthProvider_ErrorHandling(t *testing.T) {
 }
 
 func TestNewSessionManager_HandleValidation(t *testing.T) {
-	tpm, cleanup := setupTPM(t)
-	defer cleanup()
+	tpm := testutil.OpenSimulator(t)
 
 	// Create SRK for valid handle tests
 	name, _ := getSRK(t, tpm, 0x81000001)
@@ -287,8 +268,7 @@ func TestNewSessionManager_HandleValidation(t *testing.T) {
 }
 
 func TestSessionManager_IntegrationWithTPMCommands(t *testing.T) {
-	tpm, cleanup := setupTPM(t)
-	defer cleanup()
+	tpm := testutil.OpenSimulator(t)
 
 	// Create SRK
 	srkName, srkPublic := getSRK(t, tpm, 0x81000001)
@@ -377,8 +357,7 @@ func TestSessionManager_IntegrationWithTPMCommands(t *testing.T) {
 // sessions that work correctly with TPM commands supporting parameter encryption.
 // This validates that the session encryption/decryption is properly configured.
 func TestSessionManager_EncryptedCommands(t *testing.T) {
-	tpm, cleanup := setupTPM(t)
-	defer cleanup()
+	tpm := testutil.OpenSimulator(t)
 
 	// Create SRK for salted session
 	name, public := getSRK(t, tpm, 0x81000001)
@@ -534,8 +513,7 @@ func TestSessionManager_EncryptedCommands(t *testing.T) {
 }
 
 func TestSessionManager_WithHashAlg(t *testing.T) {
-	tpm, cleanup := setupTPM(t)
-	defer cleanup()
+	tpm := testutil.OpenSimulator(t)
 
 	// Create SRK
 	name, public := getSRK(t, tpm, 0x81000001)
@@ -659,8 +637,7 @@ func TestSessionManager_WithHashAlg(t *testing.T) {
 }
 
 func TestSessionManager_AuditSession(t *testing.T) {
-	tpm, cleanup := setupTPM(t)
-	defer cleanup()
+	tpm := testutil.OpenSimulator(t)
 
 	// Create SRK
 	name, public := getSRK(t, tpm, 0x81000001)
