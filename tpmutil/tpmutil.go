@@ -3,10 +3,13 @@ package tpmutil
 import (
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/rand"
 	"crypto/rsa"
 	"encoding/asn1"
 	"fmt"
+	"io"
 	"math/big"
+	"slices"
 
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
@@ -836,6 +839,118 @@ func CreateWithResult(t transport.TPM, optionalCfg ...CreateConfig) (*CreateResu
 		CreationHash:   rsp.CreationHash,
 		CreationTicket: rsp.CreationTicket,
 	}, nil
+}
+
+// GenerateIV generates a random initialization vector (IV) of the specified block size.
+//
+// The block size should match the cipher's block size requirement.
+// For AES, this is typically 16 bytes (128 bits).
+//
+// Example:
+//
+//	// Generate IV for AES (16 bytes)
+//	iv, err := tpmutil.GenerateIV(16)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+func GenerateIV(blockSize int) ([]byte, error) {
+	if blockSize <= 0 {
+		return nil, fmt.Errorf("invalid block size: %d (must be positive)", blockSize)
+	}
+	iv := make([]byte, blockSize)
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		return nil, fmt.Errorf("failed to generate IV: %w", err)
+	}
+	return iv, nil
+}
+
+// MustGenerateIV generates a random initialization vector (IV) of the specified block size.
+// It panics if an error occurs.
+//
+// This function is useful for testing or when you are certain the block size is valid.
+//
+// Example:
+//
+//	// Generate IV for AES (16 bytes)
+//	iv := tpmutil.MustGenerateIV(16)
+func MustGenerateIV(blockSize int) []byte {
+	iv, err := GenerateIV(blockSize)
+	if err != nil {
+		panic(fmt.Sprintf("MustGenerateIV: %v", err))
+	}
+	return iv
+}
+
+// SymEncryptDecrypt encrypts or decrypts data using TPM symmetric key with pagination support.
+//
+// This function handles large data by automatically paginating it into chunks that fit within
+// the TPM's buffer size limit. The IV is updated after each block to maintain cipher state.
+//
+// Example:
+//
+//	// Generate IV
+//	iv := tpmutil.MustGenerateIV(16)
+//
+//	// Encrypt data
+//	encrypted, err := tpmutil.SymEncryptDecrypt(tpm, &tpmutil.SymEncryptDecryptConfig{
+//		KeyHandle: keyHandle,
+//		Data:      []byte("secret message"),
+//		IV:        iv,
+//		Mode:      tpm2.TPMAlgCFB,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Decrypt data
+//	decrypted, err := tpmutil.SymEncryptDecrypt(tpm, &tpmutil.SymEncryptDecryptConfig{
+//		KeyHandle: keyHandle,
+//		Data:      encrypted,
+//		IV:        iv,
+//		Mode:      tpm2.TPMAlgCFB,
+//		Decrypt:   true,
+//	})
+//
+// Note: If cfg is nil, default configuration is used.
+func SymEncryptDecrypt(t transport.TPM, optionalCfg ...SymEncryptDecryptConfig) ([]byte, error) {
+	cfg := utils.OptionalArg(optionalCfg)
+	if err := cfg.CheckAndSetDefault(); err != nil {
+		return nil, err
+	}
+	return symEncryptDecrypt(t, cfg.KeyHandle, cfg.Auth, cfg.IV, cfg.Data, cfg.Mode, cfg.Decrypt, cfg.BlockSize)
+}
+
+func symEncryptDecrypt(t transport.TPM, keyHandle Handle, auth tpm2.Session, iv, data []byte, mode tpm2.TPMAlgID, decrypt bool, blockSize int) ([]byte, error) {
+	var out, block []byte
+	currentIV := slices.Clone(iv)
+
+	for rest := data; len(rest) > 0; {
+		if len(rest) > blockSize {
+			block, rest = rest[:blockSize], rest[blockSize:]
+		} else {
+			block, rest = rest, nil
+		}
+
+		r, err := tpm2.EncryptDecrypt2{
+			KeyHandle: ToAuthHandle(keyHandle, auth),
+			Message: tpm2.TPM2BMaxBuffer{
+				Buffer: block,
+			},
+			Mode:    mode,
+			Decrypt: decrypt,
+			IV: tpm2.TPM2BIV{
+				Buffer: currentIV,
+			},
+		}.Execute(t)
+		if err != nil {
+			return nil, fmt.Errorf("EncryptDecrypt2 failed (processed=%d bytes): %w", len(out), err)
+		}
+
+		block = r.OutData.Buffer
+		currentIV = r.IV.Buffer
+		out = append(out, block...)
+	}
+	return out, nil
 }
 
 // toTPM2BSensitiveCreate converts userAuth and data into a TPM2BSensitiveCreate structure.
