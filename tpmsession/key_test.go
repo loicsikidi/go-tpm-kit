@@ -7,12 +7,12 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 	"github.com/loicsikidi/go-tpm-kit/tpmsession"
 )
 
 func TestSessionKey_CheckAndSetDefault(t *testing.T) {
-	tpm, cleanup := setupTPM(t)
-	defer cleanup()
+	tpm := testutil.OpenSimulator(t)
 
 	// Create a test SRK
 	name, public := getSRK(t, tpm, 0x81000001)
@@ -116,8 +116,7 @@ func TestSessionKey_CheckAndSetDefault(t *testing.T) {
 }
 
 func TestSessionKey_Serialization(t *testing.T) {
-	tpm, cleanup := setupTPM(t)
-	defer cleanup()
+	tpm := testutil.OpenSimulator(t)
 
 	// Create a test SRK
 	name, public := getSRK(t, tpm, 0x81000001)
@@ -256,8 +255,7 @@ func TestSessionKey_Serialization(t *testing.T) {
 }
 
 func TestCreateSessionKey(t *testing.T) {
-	tpm, cleanup := setupTPM(t)
-	defer cleanup()
+	tpm := testutil.OpenSimulator(t)
 
 	// Create SRK for testing
 	name, public := getSRK(t, tpm, 0x81000001)

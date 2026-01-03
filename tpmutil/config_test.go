@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/google/go-tpm/tpm2/transport/simulator"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
@@ -190,11 +190,7 @@ func TestSignConfigValidation(t *testing.T) {
 }
 
 func TestHashConfigValidation(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	data := []byte("test data")
 

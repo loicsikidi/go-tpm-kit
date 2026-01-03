@@ -11,18 +11,14 @@ import (
 
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
-	"github.com/google/go-tpm/tpm2/transport/simulator"
 	tpmkit "github.com/loicsikidi/go-tpm-kit"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 	"github.com/loicsikidi/go-tpm-kit/tpmcrypto"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
 func TestNVWrite(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	index := tpm2.TPMHandle(0x01800001)
 	maxBufferSize := 1024
@@ -90,11 +86,7 @@ func TestNVWrite(t *testing.T) {
 }
 
 func TestHashDefault(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	run := func(t *testing.T, bufferSize int, hierarchy tpm2.TPMHandle, transport transport.TPM) {
 		data := make([]byte, bufferSize)
@@ -137,11 +129,7 @@ func TestHashDefault(t *testing.T) {
 }
 
 func TestTPMHashMsgTooShort(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	// TPM will refuse to hash a message that is too short.
 	sizes := []int{0, 1, 2}
@@ -162,11 +150,7 @@ func TestTPMHashMsgTooShort(t *testing.T) {
 }
 
 func TestTPMHash(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	sizes := []int{
 		tpmkit.MaxBufferSize / 2,
@@ -206,11 +190,7 @@ func TestTPMHash(t *testing.T) {
 }
 
 func TestHash(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	data := []byte("hello world")
 	cfg := tpmutil.HashConfig{
@@ -237,11 +217,7 @@ func TestHash(t *testing.T) {
 }
 
 func TestHashWithCustomConfig(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	cfg := tpmutil.HashConfig{
 		Hierarchy: tpm2.TPMRHOwner,
@@ -265,11 +241,7 @@ func TestHashWithCustomConfig(t *testing.T) {
 }
 
 func TestSign(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	// Create a primary signing key
 	signingTemplate := tpm2.TPMTPublic{
@@ -361,11 +333,7 @@ func TestSign(t *testing.T) {
 }
 
 func TestNVRead(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	index := tpm2.TPMHandle(0x01800001)
 	data := []byte("test data")
@@ -375,7 +343,7 @@ func TestNVRead(t *testing.T) {
 		Index: index,
 		Data:  data,
 	}
-	err = tpmutil.NVWrite(thetpm, writeCfg)
+	err := tpmutil.NVWrite(thetpm, writeCfg)
 	if err != nil {
 		t.Fatalf("NVWrite() failed: %v", err)
 	}
@@ -499,11 +467,7 @@ func TestMustGenerateIV(t *testing.T) {
 }
 
 func TestSymEncryptDecrypt(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	primary, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHOwner,
@@ -631,11 +595,7 @@ func TestSymEncryptDecrypt(t *testing.T) {
 }
 
 func TestSymEncryptDecryptValidation(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	primary, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHOwner,

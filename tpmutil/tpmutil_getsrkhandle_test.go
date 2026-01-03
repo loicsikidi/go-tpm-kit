@@ -4,17 +4,13 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/google/go-tpm/tpm2/transport/simulator"
 	tpmkit "github.com/loicsikidi/go-tpm-kit"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
 func TestGetSKRHandle_CreateNew_RSA(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	cfg := tpmutil.ParentConfig{
 		KeyFamily: tpmutil.RSA,
@@ -48,11 +44,7 @@ func TestGetSKRHandle_CreateNew_RSA(t *testing.T) {
 }
 
 func TestGetSKRHandle_CreateNew_ECC(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	cfg := tpmutil.ParentConfig{
 		KeyFamily: tpmutil.ECC,
@@ -86,17 +78,13 @@ func TestGetSKRHandle_CreateNew_ECC(t *testing.T) {
 }
 
 func TestGetSKRHandle_AlreadyPersisted_SKR(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	// First, create and persist an RSA SRK
 	cfg := tpmutil.ParentConfig{
 		KeyFamily: tpmutil.RSA,
 	}
-	_, err = tpmutil.GetSKRHandle(thetpm, cfg)
+	_, err := tpmutil.GetSKRHandle(thetpm, cfg)
 	if err != nil {
 		t.Fatalf("Initial GetSKRHandle() failed: %v", err)
 	}
@@ -134,11 +122,7 @@ func TestGetSKRHandle_AlreadyPersisted_SKR(t *testing.T) {
 }
 
 func TestGetSKRHandle_CustomOwnerPassword(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	// Set a custom owner hierarchy password
 	ownerPassword := []byte("custom-owner-password")
@@ -148,7 +132,7 @@ func TestGetSKRHandle_CustomOwnerPassword(t *testing.T) {
 			Buffer: ownerPassword,
 		},
 	}
-	_, err = hierChange.Execute(thetpm)
+	_, err := hierChange.Execute(thetpm)
 	if err != nil {
 		t.Fatalf("HierarchyChangeAuth() failed: %v", err)
 	}
@@ -169,11 +153,7 @@ func TestGetSKRHandle_CustomOwnerPassword(t *testing.T) {
 }
 
 func TestGetSKRHandle_NonStandardHandle(t *testing.T) {
-	thetpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("Failed to open simulator: %v", err)
-	}
-	defer thetpm.Close()
+	thetpm := testutil.OpenSimulator(t)
 
 	// Use a non-standard persistent handle
 	customHandle := tpm2.TPMHandle(0x81000010)
