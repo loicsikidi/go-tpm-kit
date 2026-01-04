@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 
 	tpmkit "github.com/loicsikidi/go-tpm-kit"
 
@@ -487,6 +488,36 @@ func NewECCSigKeyParameters(curve tpm2.TPMECCCurve) (*tpm2.TPMUPublicParms, erro
 				Details: details,
 			},
 			CurveID: curve,
+		},
+	)
+	return &params, nil
+}
+
+// NewHMACParameters creates a new HMAC key parameters structure
+// based on the specified hash algorithm.
+//
+// The hash algorithm must be one of the supported TPM hash algorithms
+// (e.g., TPMAlgSHA256, TPMAlgSHA384, or TPMAlgSHA512).
+//
+// Example:
+//
+//	params, err := tpmcrypto.NewHMACParameters(tpm2.TPMAlgSHA256)
+func NewHMACParameters(hashAlg tpm2.TPMAlgID) (*tpm2.TPMUPublicParms, error) {
+	if !slices.Contains([]tpm2.TPMAlgID{tpm2.TPMAlgSHA256, tpm2.TPMAlgSHA384, tpm2.TPMAlgSHA512}, hashAlg) {
+		return nil, fmt.Errorf("unsupported hash algorithm for HMAC: %#x", hashAlg)
+	}
+	params := tpm2.NewTPMUPublicParms(
+		tpm2.TPMAlgKeyedHash,
+		&tpm2.TPMSKeyedHashParms{
+			Scheme: tpm2.TPMTKeyedHashScheme{
+				Scheme: tpm2.TPMAlgHMAC,
+				Details: tpm2.NewTPMUSchemeKeyedHash(
+					tpm2.TPMAlgHMAC,
+					&tpm2.TPMSSchemeHMAC{
+						HashAlg: hashAlg,
+					},
+				),
+			},
 		},
 	)
 	return &params, nil

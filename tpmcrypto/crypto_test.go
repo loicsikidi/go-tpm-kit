@@ -596,6 +596,80 @@ func TestNewECCKeyUnique(t *testing.T) {
 	}
 }
 
+func TestNewHMACParameters(t *testing.T) {
+	tests := []struct {
+		name     string
+		hashAlg  tpm2.TPMAlgID
+		wantErr  bool
+		wantHash tpm2.TPMAlgID
+	}{
+		{
+			name:     "SHA256",
+			hashAlg:  tpm2.TPMAlgSHA256,
+			wantErr:  false,
+			wantHash: tpm2.TPMAlgSHA256,
+		},
+		{
+			name:     "SHA384",
+			hashAlg:  tpm2.TPMAlgSHA384,
+			wantErr:  false,
+			wantHash: tpm2.TPMAlgSHA384,
+		},
+		{
+			name:     "SHA512",
+			hashAlg:  tpm2.TPMAlgSHA512,
+			wantErr:  false,
+			wantHash: tpm2.TPMAlgSHA512,
+		},
+		{
+			name:    "unsupported hash algorithm",
+			hashAlg: tpm2.TPMAlgSHA1,
+			wantErr: true,
+		},
+		{
+			name:    "null algorithm",
+			hashAlg: tpm2.TPMAlgNull,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params, err := NewHMACParameters(tt.hashAlg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewHMACParameters() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr {
+				return
+			}
+
+			if params == nil {
+				t.Error("NewHMACParameters() returned nil params")
+				return
+			}
+
+			keyedHashParams, err := params.KeyedHashDetail()
+			if err != nil {
+				t.Fatalf("failed to get keyed hash details: %v", err)
+			}
+
+			if keyedHashParams.Scheme.Scheme != tpm2.TPMAlgHMAC {
+				t.Errorf("scheme = %v, want %v", keyedHashParams.Scheme.Scheme, tpm2.TPMAlgHMAC)
+			}
+
+			hmacScheme, err := keyedHashParams.Scheme.Details.HMAC()
+			if err != nil {
+				t.Fatalf("failed to get HMAC scheme: %v", err)
+			}
+
+			if hmacScheme.HashAlg != tt.wantHash {
+				t.Errorf("hash algorithm = %v, want %v", hmacScheme.HashAlg, tt.wantHash)
+			}
+		})
+	}
+}
+
 func TestVerifySignature(t *testing.T) {
 	t.Run("RSA signature", func(t *testing.T) {
 		rsaKey, err := rsa.GenerateKey(rand.Reader, 1024)
