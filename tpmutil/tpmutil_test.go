@@ -61,7 +61,7 @@ func TestNVWrite(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			data := tpmutil.MustGenerateIV(tt.payloadSize)
+			data := tpmutil.MustGenerateRnd(tt.payloadSize)
 
 			cfg := tpmutil.NVWriteConfig{
 				Index: index,
@@ -436,14 +436,14 @@ func TestGenerateIV(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			iv, err := tpmutil.GenerateIV(tt.blockSize)
+			b, err := tpmutil.GenerateRnd(tt.blockSize)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("GenerateIV() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("GenerateRnd() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr {
-				if len(iv) != tt.blockSize {
-					t.Errorf("GenerateIV() returned IV of length %d, want %d", len(iv), tt.blockSize)
+				if len(b) != tt.blockSize {
+					t.Errorf("GenerateRnd() returned byte slice of length %d, want %d", len(b), tt.blockSize)
 				}
 			}
 		})
@@ -482,7 +482,7 @@ func TestMustGenerateIV(t *testing.T) {
 				}
 			}()
 
-			iv := tpmutil.MustGenerateIV(tt.blockSize)
+			iv := tpmutil.MustGenerateRnd(tt.blockSize)
 			if !tt.shouldPanic && len(iv) != tt.blockSize {
 				t.Errorf("tpmutil.MustGenerateIV() returned IV of length %d, want %d", len(iv), tt.blockSize)
 			}
@@ -572,8 +572,8 @@ func TestSymEncryptDecrypt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			message := tpmutil.MustGenerateIV(tt.dataSize)
-			iv := tpmutil.MustGenerateIV(16)
+			message := tpmutil.MustGenerateRnd(tt.dataSize)
+			iv := tpmutil.MustGenerateRnd(16)
 
 			encryptCfg := tpmutil.SymEncryptDecryptConfig{
 				KeyHandle: primary,
@@ -663,7 +663,7 @@ func TestSymEncryptDecryptValidation(t *testing.T) {
 			name: "missing handle",
 			cfg: tpmutil.SymEncryptDecryptConfig{
 				Data: []byte("data"),
-				IV:   tpmutil.MustGenerateIV(16),
+				IV:   tpmutil.MustGenerateRnd(16),
 			},
 			wantErr: true,
 		},
@@ -671,7 +671,7 @@ func TestSymEncryptDecryptValidation(t *testing.T) {
 			name: "missing data",
 			cfg: tpmutil.SymEncryptDecryptConfig{
 				KeyHandle: primary,
-				IV:        tpmutil.MustGenerateIV(16),
+				IV:        tpmutil.MustGenerateRnd(16),
 			},
 			wantErr: true,
 		},
@@ -688,7 +688,7 @@ func TestSymEncryptDecryptValidation(t *testing.T) {
 			cfg: tpmutil.SymEncryptDecryptConfig{
 				KeyHandle: primary,
 				Data:      []byte("data"),
-				IV:        tpmutil.MustGenerateIV(16),
+				IV:        tpmutil.MustGenerateRnd(16),
 				BlockSize: -1,
 			},
 			wantErr: true,

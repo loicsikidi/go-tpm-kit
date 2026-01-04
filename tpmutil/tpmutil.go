@@ -189,12 +189,6 @@ type HashResult struct {
 	Validation tpm2.TPMTTKHashCheck
 }
 
-// HmacResult contains the result of a TPM HMAC operation.
-type HmacResult struct {
-	// Digest is the computed HMAC digest.
-	Digest []byte
-}
-
 // Hash hashes data using the TPM with the provided configuration.
 //
 // Note: If cfg is nil, default configuration is used.
@@ -230,7 +224,7 @@ func hash(t transport.TPM, hierarchy tpm2.TPMHandle, blockSize int, data []byte,
 	nilTicket := tpm2.TPMTTKHashCheck{}
 
 	// Generate an ephemeral authorization for the sequence
-	sequenceAuth := MustGenerateIV(32)
+	sequenceAuth := MustGenerateRnd(32)
 
 	alg, err := tpmcrypto.HashToAlgorithm(h)
 	if err != nil {
@@ -317,7 +311,7 @@ func Hmac(t transport.TPM, optionalCfg ...HmacConfig) ([]byte, error) {
 
 func hmac(t transport.TPM, keyHandle Handle, auth tpm2.Session, blockSize int, data []byte, hashAlg tpm2.TPMAlgID, hierarchy tpm2.TPMHandle) ([]byte, error) {
 	// Generate an ephemeral authorization for the sequence
-	sequenceAuth := MustGenerateIV(32)
+	sequenceAuth := MustGenerateRnd(32)
 
 	hmacStart := tpm2.HmacStart{
 		Handle: ToAuthHandle(keyHandle, auth),
@@ -928,44 +922,46 @@ func CreateWithResult(t transport.TPM, optionalCfg ...CreateConfig) (*CreateResu
 	}, nil
 }
 
-// GenerateIV generates a random initialization vector (IV) of the specified block size.
+// GenerateRnd generates a random byte slice of the specified size.
 //
-// The block size should match the cipher's block size requirement.
+// The size should match the cipher's block size requirement.
+//
+// This function can be used to generate a random IV (initialization vector) for encryption.
 // For AES, this is typically 16 bytes (128 bits).
 //
 // Example:
 //
-//	// Generate IV for AES (16 bytes)
-//	iv, err := tpmutil.GenerateIV(16)
+//	// Generate random bytes (16 bytes)
+//	iv, err := tpmutil.GenerateRnd(16)
 //	if err != nil {
 //		log.Fatal(err)
 //	}
-func GenerateIV(blockSize int) ([]byte, error) {
-	if blockSize <= 0 {
-		return nil, fmt.Errorf("invalid block size: %d (must be positive)", blockSize)
+func GenerateRnd(size int) ([]byte, error) {
+	if size <= 0 {
+		return nil, fmt.Errorf("invalid size: %d (must be positive)", size)
 	}
-	iv := make([]byte, blockSize)
+	iv := make([]byte, size)
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
 		return nil, fmt.Errorf("failed to generate IV: %w", err)
 	}
 	return iv, nil
 }
 
-// MustGenerateIV generates a random initialization vector (IV) of the specified block size.
+// MustGenerateRnd generates a random byte slice of the specified size.
 // It panics if an error occurs.
 //
-// This function is useful for testing or when you are certain the block size is valid.
+// This function is useful for testing or when you are certain the size is valid.
 //
 // Example:
 //
-//	// Generate IV for AES (16 bytes)
-//	iv := tpmutil.MustGenerateIV(16)
-func MustGenerateIV(blockSize int) []byte {
-	iv, err := GenerateIV(blockSize)
+//	// Generate random bytes (16 bytes)
+//	rnd := tpmutil.MustGenerateRnd(16)
+func MustGenerateRnd(size int) []byte {
+	b, err := GenerateRnd(size)
 	if err != nil {
-		panic(fmt.Sprintf("MustGenerateIV: %v", err))
+		panic(fmt.Sprintf("MustGenerateRnd: %v", err))
 	}
-	return iv
+	return b
 }
 
 // SymEncryptDecrypt encrypts or decrypts data using TPM symmetric key with pagination support.
