@@ -189,6 +189,12 @@ type HashResult struct {
 	Validation tpm2.TPMTTKHashCheck
 }
 
+// HmacResult contains the result of a TPM HMAC operation.
+type HmacResult struct {
+	// Digest is the computed HMAC digest.
+	Digest []byte
+}
+
 // Hash hashes data using the TPM with the provided configuration.
 //
 // Note: If cfg is nil, default configuration is used.
@@ -210,7 +216,7 @@ func Hash(t transport.TPM, optionalCfg ...HashConfig) (*HashResult, error) {
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
 	}
-	digest, validation, err := hash(t, cfg.Hierarchy, cfg.Password, cfg.BlockSize, cfg.Data, cfg.HashAlg)
+	digest, validation, err := hash(t, cfg.Hierarchy, cfg.BlockSize, cfg.Data, cfg.HashAlg)
 	if err != nil {
 		return nil, err
 	}
@@ -220,10 +226,12 @@ func Hash(t transport.TPM, optionalCfg ...HashConfig) (*HashResult, error) {
 	}, nil
 }
 
-func hash(t transport.TPM, hierarchy tpm2.TPMHandle, password string, blockSize int, data []byte, h crypto.Hash) ([]byte, tpm2.TPMTTKHashCheck, error) {
+func hash(t transport.TPM, hierarchy tpm2.TPMHandle, blockSize int, data []byte, h crypto.Hash) ([]byte, tpm2.TPMTTKHashCheck, error) {
 	nilTicket := tpm2.TPMTTKHashCheck{}
 
-	auth := []byte(password)
+	// Generate an ephemeral authorization for the sequence
+	sequenceAuth := MustGenerateIV(32)
+
 	alg, err := tpmcrypto.HashToAlgorithm(h)
 	if err != nil {
 		return nil, nilTicket, err
@@ -231,7 +239,7 @@ func hash(t transport.TPM, hierarchy tpm2.TPMHandle, password string, blockSize 
 
 	hashSequenceStart := tpm2.HashSequenceStart{
 		Auth: tpm2.TPM2BAuth{
-			Buffer: auth,
+			Buffer: sequenceAuth,
 		},
 		HashAlg: alg,
 	}
@@ -244,9 +252,9 @@ func hash(t transport.TPM, hierarchy tpm2.TPMHandle, password string, blockSize 
 	authHandle := ToAuthHandle(NewHandle(&tpm2.NamedHandle{
 		Handle: rspHSS.SequenceHandle,
 		Name: tpm2.TPM2BName{
-			Buffer: auth,
+			Buffer: sequenceAuth,
 		},
-	}), tpm2.PasswordAuth(auth))
+	}), tpm2.PasswordAuth(sequenceAuth))
 
 	for len(data) > blockSize {
 		sequenceUpdate := tpm2.SequenceUpdate{
@@ -281,6 +289,85 @@ func hash(t transport.TPM, hierarchy tpm2.TPMHandle, password string, blockSize 
 	}
 
 	return rspSC.Result.Buffer, rspSC.Validation, nil
+}
+
+// Hmac computes HMAC using the TPM with the provided configuration.
+//
+// Example:
+//
+//	// Compute HMAC with a TPM key
+//	result, err := tpmutil.Hmac(tpm, &tpmutil.HmacConfig{
+//		KeyHandle: hmacKeyHandle,
+//		Data:      []byte("data to authenticate"),
+//		Auth:      tpm2.PasswordAuth([]byte("keypassword")),
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Printf("HMAC: %x\n", result.Digest)
+//
+// Note: If cfg is nil, default configuration is used.
+func Hmac(t transport.TPM, optionalCfg ...HmacConfig) ([]byte, error) {
+	cfg := utils.OptionalArg(optionalCfg)
+	if err := cfg.CheckAndSetDefault(); err != nil {
+		return nil, err
+	}
+	return hmac(t, cfg.KeyHandle, cfg.Auth, cfg.BlockSize, cfg.Data, cfg.HashAlg, cfg.Hierarchy)
+}
+
+func hmac(t transport.TPM, keyHandle Handle, auth tpm2.Session, blockSize int, data []byte, hashAlg tpm2.TPMAlgID, hierarchy tpm2.TPMHandle) ([]byte, error) {
+	// Generate an ephemeral authorization for the sequence
+	sequenceAuth := MustGenerateIV(32)
+
+	hmacStart := tpm2.HmacStart{
+		Handle: ToAuthHandle(keyHandle, auth),
+		Auth: tpm2.TPM2BAuth{
+			Buffer: sequenceAuth,
+		},
+		HashAlg: hashAlg,
+	}
+
+	rspHS, err := hmacStart.Execute(t)
+	if err != nil {
+		return nil, fmt.Errorf("HmacStart failed: %w", err)
+	}
+
+	authHandle := ToAuthHandle(NewHandle(&tpm2.NamedHandle{
+		Handle: rspHS.SequenceHandle,
+		Name: tpm2.TPM2BName{
+			Buffer: sequenceAuth,
+		},
+	}), tpm2.PasswordAuth(sequenceAuth))
+
+	for len(data) > blockSize {
+		sequenceUpdate := tpm2.SequenceUpdate{
+			SequenceHandle: authHandle,
+			Buffer: tpm2.TPM2BMaxBuffer{
+				Buffer: data[:blockSize],
+			},
+		}
+		_, err = sequenceUpdate.Execute(t)
+		if err != nil {
+			return nil, fmt.Errorf("SequenceUpdate failed: %w", err)
+		}
+
+		data = data[blockSize:]
+	}
+
+	sequenceComplete := tpm2.SequenceComplete{
+		SequenceHandle: authHandle,
+		Buffer: tpm2.TPM2BMaxBuffer{
+			Buffer: data,
+		},
+		Hierarchy: hierarchy,
+	}
+
+	rspSC, err := sequenceComplete.Execute(t)
+	if err != nil {
+		return nil, fmt.Errorf("SequenceComplete failed: %w", err)
+	}
+
+	return rspSC.Result.Buffer, nil
 }
 
 // Sign signs a digest using the TPM with the provided configuration.
