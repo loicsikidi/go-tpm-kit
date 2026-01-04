@@ -273,3 +273,94 @@ func TestHashConfigValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestHmacConfigValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     tpmutil.HmacConfig
+		wantErr error
+	}{
+		{
+			name:    "missing KeyHandle",
+			cfg:     tpmutil.HmacConfig{Data: []byte("test")},
+			wantErr: tpmutil.ErrMissingHandle,
+		},
+		{
+			name: "missing Data",
+			cfg: tpmutil.HmacConfig{
+				KeyHandle: tpmutil.NewHandle(&tpm2.NamedHandle{}),
+			},
+			wantErr: tpmutil.ErrMissingData,
+		},
+		{
+			name: "negative BlockSize",
+			cfg: tpmutil.HmacConfig{
+				KeyHandle: tpmutil.NewHandle(&tpm2.NamedHandle{}),
+				Data:      []byte("test"),
+				BlockSize: -1,
+			},
+			wantErr: tpmutil.ErrInvalidBlockSize,
+		},
+		{
+			name: "BlockSize exceeds maximum gets capped",
+			cfg: tpmutil.HmacConfig{
+				KeyHandle: tpmutil.NewHandle(&tpm2.NamedHandle{}),
+				Data:      []byte("test"),
+				BlockSize: 2000,
+			},
+			wantErr: nil,
+		},
+		{
+			name: "zero BlockSize uses default",
+			cfg: tpmutil.HmacConfig{
+				KeyHandle: tpmutil.NewHandle(&tpm2.NamedHandle{}),
+				Data:      []byte("test"),
+				BlockSize: 0,
+			},
+			wantErr: nil,
+		},
+		{
+			name: "valid custom BlockSize",
+			cfg: tpmutil.HmacConfig{
+				KeyHandle: tpmutil.NewHandle(&tpm2.NamedHandle{}),
+				Data:      []byte("test"),
+				BlockSize: 512,
+			},
+			wantErr: nil,
+		},
+		{
+			name: "valid config with all defaults",
+			cfg: tpmutil.HmacConfig{
+				KeyHandle: tpmutil.NewHandle(&tpm2.NamedHandle{}),
+				Data:      []byte("test"),
+			},
+			wantErr: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.cfg.CheckAndSetDefault()
+			if tt.wantErr != nil {
+				if err == nil {
+					t.Errorf("expected error %v, got nil", tt.wantErr)
+				} else if err != tt.wantErr {
+					t.Errorf("expected error %v, got %v", tt.wantErr, err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("expected no error, got %v", err)
+				}
+				if tt.cfg.BlockSize <= 0 || tt.cfg.BlockSize > 1024 {
+					t.Errorf("expected BlockSize to be capped at 1024, got %d", tt.cfg.BlockSize)
+				}
+				if tt.cfg.Hierarchy == 0 {
+					t.Error("expected Hierarchy to be set to default")
+				}
+				if tt.cfg.Auth == nil {
+					t.Error("expected Auth to be set to default")
+				}
+			}
+		})
+	}
+}

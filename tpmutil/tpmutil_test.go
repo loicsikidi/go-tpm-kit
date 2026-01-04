@@ -17,6 +17,32 @@ import (
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
+var hmacKeyTemplate = tpm2.TPMTPublic{
+	Type:    tpm2.TPMAlgKeyedHash,
+	NameAlg: tpm2.TPMAlgSHA256,
+	ObjectAttributes: tpm2.TPMAObject{
+		SignEncrypt:         true,
+		FixedTPM:            true,
+		FixedParent:         true,
+		SensitiveDataOrigin: true,
+		UserWithAuth:        true,
+	},
+	Parameters: tpm2.NewTPMUPublicParms(
+		tpm2.TPMAlgKeyedHash,
+		&tpm2.TPMSKeyedHashParms{
+			Scheme: tpm2.TPMTKeyedHashScheme{
+				Scheme: tpm2.TPMAlgHMAC,
+				Details: tpm2.NewTPMUSchemeKeyedHash(
+					tpm2.TPMAlgHMAC,
+					&tpm2.TPMSSchemeHMAC{
+						HashAlg: tpm2.TPMAlgSHA256,
+					},
+				),
+			},
+		},
+	),
+}
+
 func TestNVWrite(t *testing.T) {
 	thetpm := testutil.OpenSimulator(t)
 
@@ -35,7 +61,7 @@ func TestNVWrite(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			data := tpmutil.MustGenerateIV(tt.payloadSize)
+			data := tpmutil.MustGenerateRnd(tt.payloadSize)
 
 			cfg := tpmutil.NVWriteConfig{
 				Index: index,
@@ -195,7 +221,6 @@ func TestHash(t *testing.T) {
 	data := []byte("hello world")
 	cfg := tpmutil.HashConfig{
 		Hierarchy: tpm2.TPMRHOwner,
-		Password:  "",
 		BlockSize: 1024,
 		HashAlg:   crypto.SHA256,
 		Data:      data,
@@ -221,7 +246,6 @@ func TestHashWithCustomConfig(t *testing.T) {
 
 	cfg := tpmutil.HashConfig{
 		Hierarchy: tpm2.TPMRHOwner,
-		Password:  "custom-password",
 		BlockSize: 512,
 		HashAlg:   crypto.SHA256,
 		Data:      []byte("hello world"),
@@ -412,14 +436,14 @@ func TestGenerateIV(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			iv, err := tpmutil.GenerateIV(tt.blockSize)
+			b, err := tpmutil.GenerateRnd(tt.blockSize)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("GenerateIV() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("GenerateRnd() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr {
-				if len(iv) != tt.blockSize {
-					t.Errorf("GenerateIV() returned IV of length %d, want %d", len(iv), tt.blockSize)
+				if len(b) != tt.blockSize {
+					t.Errorf("GenerateRnd() returned byte slice of length %d, want %d", len(b), tt.blockSize)
 				}
 			}
 		})
@@ -458,7 +482,7 @@ func TestMustGenerateIV(t *testing.T) {
 				}
 			}()
 
-			iv := tpmutil.MustGenerateIV(tt.blockSize)
+			iv := tpmutil.MustGenerateRnd(tt.blockSize)
 			if !tt.shouldPanic && len(iv) != tt.blockSize {
 				t.Errorf("tpmutil.MustGenerateIV() returned IV of length %d, want %d", len(iv), tt.blockSize)
 			}
@@ -548,8 +572,8 @@ func TestSymEncryptDecrypt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			message := tpmutil.MustGenerateIV(tt.dataSize)
-			iv := tpmutil.MustGenerateIV(16)
+			message := tpmutil.MustGenerateRnd(tt.dataSize)
+			iv := tpmutil.MustGenerateRnd(16)
 
 			encryptCfg := tpmutil.SymEncryptDecryptConfig{
 				KeyHandle: primary,
@@ -639,7 +663,7 @@ func TestSymEncryptDecryptValidation(t *testing.T) {
 			name: "missing handle",
 			cfg: tpmutil.SymEncryptDecryptConfig{
 				Data: []byte("data"),
-				IV:   tpmutil.MustGenerateIV(16),
+				IV:   tpmutil.MustGenerateRnd(16),
 			},
 			wantErr: true,
 		},
@@ -647,7 +671,7 @@ func TestSymEncryptDecryptValidation(t *testing.T) {
 			name: "missing data",
 			cfg: tpmutil.SymEncryptDecryptConfig{
 				KeyHandle: primary,
-				IV:        tpmutil.MustGenerateIV(16),
+				IV:        tpmutil.MustGenerateRnd(16),
 			},
 			wantErr: true,
 		},
@@ -664,7 +688,7 @@ func TestSymEncryptDecryptValidation(t *testing.T) {
 			cfg: tpmutil.SymEncryptDecryptConfig{
 				KeyHandle: primary,
 				Data:      []byte("data"),
-				IV:        tpmutil.MustGenerateIV(16),
+				IV:        tpmutil.MustGenerateRnd(16),
 				BlockSize: -1,
 			},
 			wantErr: true,
@@ -676,6 +700,230 @@ func TestSymEncryptDecryptValidation(t *testing.T) {
 			_, err := tpmutil.SymEncryptDecrypt(thetpm, tt.cfg)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("SymEncryptDecrypt() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestHmac(t *testing.T) {
+	thetpm := testutil.OpenSimulator(t)
+
+	hmacKey, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
+		PrimaryHandle: tpm2.TPMRHOwner,
+		InPublic:      hmacKeyTemplate,
+	})
+	if err != nil {
+		t.Fatalf("CreatePrimary() failed: %v", err)
+	}
+	defer hmacKey.Close()
+
+	data := []byte("hello world")
+	cfg := tpmutil.HmacConfig{
+		KeyHandle: hmacKey,
+		Data:      data,
+		Hierarchy: tpm2.TPMRHOwner,
+	}
+
+	result, err := tpmutil.Hmac(thetpm, cfg)
+	if err != nil {
+		t.Fatalf("Hmac() failed: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Hmac() returned nil result")
+	}
+
+	if len(result) != 32 {
+		t.Errorf("Expected digest length 32 (SHA256), got %d", len(result))
+	}
+}
+
+func TestHmacWithCustomConfig(t *testing.T) {
+	thetpm := testutil.OpenSimulator(t)
+
+	hmacKey, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
+		PrimaryHandle: tpm2.TPMRHOwner,
+		InPublic:      hmacKeyTemplate,
+	})
+	if err != nil {
+		t.Fatalf("CreatePrimary() failed: %v", err)
+	}
+	defer hmacKey.Close()
+
+	cfg := tpmutil.HmacConfig{
+		KeyHandle: hmacKey,
+		Data:      []byte("test data"),
+		BlockSize: 512,
+		HashAlg:   tpm2.TPMAlgNull,
+		Hierarchy: tpm2.TPMRHOwner,
+	}
+
+	result, err := tpmutil.Hmac(thetpm, cfg)
+	if err != nil {
+		t.Fatalf("Hmac() failed: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Hmac() returned nil result")
+	}
+
+	if len(result) != 32 {
+		t.Errorf("Expected digest length 32 (SHA256), got %d", len(result))
+	}
+}
+
+func TestHmacWithVariousDataSizes(t *testing.T) {
+	thetpm := testutil.OpenSimulator(t)
+
+	hmacKey, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
+		PrimaryHandle: tpm2.TPMRHOwner,
+		InPublic:      hmacKeyTemplate,
+	})
+	if err != nil {
+		t.Fatalf("CreatePrimary() failed: %v", err)
+	}
+	defer hmacKey.Close()
+
+	sizes := []int{
+		tpmkit.MaxBufferSize / 2,
+		tpmkit.MaxBufferSize - 1,
+		tpmkit.MaxBufferSize,
+		tpmkit.MaxBufferSize + 1,
+		int(float64(tpmkit.MaxBufferSize) * 1.5),
+		tpmkit.MaxBufferSize*2 - 1,
+		tpmkit.MaxBufferSize * 2,
+		tpmkit.MaxBufferSize*2 + 1,
+	}
+
+	for _, size := range sizes {
+		t.Run(fmt.Sprintf("size=%d", size), func(t *testing.T) {
+			msg := make([]byte, size)
+			rand.Read(msg)
+
+			cfg := tpmutil.HmacConfig{
+				KeyHandle: hmacKey,
+				Data:      msg,
+			}
+			result, err := tpmutil.Hmac(thetpm, cfg)
+			if err != nil {
+				t.Fatalf("Hmac() failed: %v", err)
+			}
+			if result == nil {
+				t.Fatal("Hmac() returned nil result")
+			}
+
+			if len(result) != 32 {
+				t.Errorf("Expected digest length 32 (SHA256), got %d", len(result))
+			}
+
+			result2, err := tpmutil.Hmac(thetpm, cfg)
+			if err != nil {
+				t.Fatalf("Hmac() second call failed: %v", err)
+			}
+
+			if !bytes.Equal(result, result2) {
+				t.Errorf("HMAC should be deterministic for same input")
+			}
+		})
+	}
+}
+
+func TestHmacWithDifferentBlockSizes(t *testing.T) {
+	thetpm := testutil.OpenSimulator(t)
+
+	hmacKey, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
+		PrimaryHandle: tpm2.TPMRHOwner,
+		InPublic:      hmacKeyTemplate,
+	})
+	if err != nil {
+		t.Fatalf("CreatePrimary() failed: %v", err)
+	}
+	defer hmacKey.Close()
+
+	data := make([]byte, 2048)
+	rand.Read(data)
+
+	blockSizes := []int{512, 1024, 2048}
+
+	var results [][]byte
+	for _, blockSize := range blockSizes {
+		t.Run(fmt.Sprintf("blockSize=%d", blockSize), func(t *testing.T) {
+			cfg := tpmutil.HmacConfig{
+				KeyHandle: hmacKey,
+				Data:      data,
+				BlockSize: blockSize,
+			}
+			result, err := tpmutil.Hmac(thetpm, cfg)
+			if err != nil {
+				t.Fatalf("Hmac() failed: %v", err)
+			}
+			if result == nil {
+				t.Fatal("Hmac() returned nil result")
+			}
+			results = append(results, result)
+		})
+	}
+
+	for i := 1; i < len(results); i++ {
+		if !bytes.Equal(results[0], results[i]) {
+			t.Errorf("HMAC result should be the same regardless of block size")
+		}
+	}
+}
+
+func TestHmacValidation(t *testing.T) {
+	thetpm := testutil.OpenSimulator(t)
+
+	hmacKey, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
+		PrimaryHandle: tpm2.TPMRHOwner,
+		InPublic:      hmacKeyTemplate,
+	})
+	if err != nil {
+		t.Fatalf("CreatePrimary() failed: %v", err)
+	}
+	defer hmacKey.Close()
+
+	tests := []struct {
+		name    string
+		cfg     tpmutil.HmacConfig
+		wantErr bool
+	}{
+		{
+			name: "missing handle",
+			cfg: tpmutil.HmacConfig{
+				Data: []byte("data"),
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing data",
+			cfg: tpmutil.HmacConfig{
+				KeyHandle: hmacKey,
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid block size",
+			cfg: tpmutil.HmacConfig{
+				KeyHandle: hmacKey,
+				Data:      []byte("data"),
+				BlockSize: -1,
+			},
+			wantErr: true,
+		},
+		{
+			name: "valid config with defaults",
+			cfg: tpmutil.HmacConfig{
+				KeyHandle: hmacKey,
+				Data:      []byte("test data"),
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := tpmutil.Hmac(thetpm, tt.cfg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Hmac() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

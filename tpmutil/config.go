@@ -14,10 +14,6 @@ type HashConfig struct {
 	//
 	// Defaut: [tpm2.TPMRHOwner].
 	Hierarchy tpm2.TPMHandle
-	// Password for the hierarchy.
-	//
-	// Defaut: empty string.
-	Password string // TODO(lsikidi): can it be replaced with tpm2.Session?
 	// BlockSize for sequential hash operations.
 	//
 	// Defaut: maxBufferSize (1024 bytes).
@@ -454,6 +450,57 @@ func (c *SymEncryptDecryptConfig) CheckAndSetDefault() error {
 	}
 	if c.BlockSize == 0 || c.BlockSize > maxBufferSize {
 		c.BlockSize = maxBufferSize
+	}
+	return nil
+}
+
+// HmacConfig holds configuration for TPM HMAC operations.
+type HmacConfig struct {
+	// KeyHandle is the handle to the HMAC key.
+	//
+	// Required.
+	KeyHandle Handle
+	// Auth is the authorization session for the key.
+	//
+	// Default: [NoAuth].
+	Auth tpm2.Session
+	// BlockSize for sequential HMAC operations.
+	//
+	// Default: maxBufferSize (1024 bytes).
+	BlockSize int
+	// HashAlg specifies the hash algorithm to use for HMAC.
+	//
+	// Default: [tpm2.TPMAlgNull] (uses the key's algorithm).
+	HashAlg tpm2.TPMAlgID
+	// Data to be HMACed.
+	//
+	// Required.
+	Data []byte
+	// Hierarchy specifies which TPM hierarchy to use for completing the sequence.
+	//
+	// Default: [tpm2.TPMRHOwner].
+	Hierarchy tpm2.TPMHandle
+}
+
+// CheckAndSetDefault validates and sets default values for HmacConfig.
+func (c *HmacConfig) CheckAndSetDefault() error {
+	if c.KeyHandle == nil {
+		return ErrMissingHandle
+	}
+	if c.BlockSize < 0 {
+		return ErrInvalidBlockSize
+	}
+	if c.BlockSize == 0 || c.BlockSize > maxBufferSize {
+		c.BlockSize = maxBufferSize
+	}
+	if c.Hierarchy == 0 {
+		c.Hierarchy = tpm2.TPMRHOwner
+	}
+	if c.Auth == nil {
+		c.Auth = NoAuth
+	}
+	if len(c.Data) == 0 {
+		return ErrMissingData
 	}
 	return nil
 }
