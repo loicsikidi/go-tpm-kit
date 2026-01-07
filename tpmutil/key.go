@@ -2,8 +2,11 @@ package tpmutil
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/google/go-tpm/tpm2"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils"
+	"github.com/loicsikidi/go-tpm-kit/tpmcrypto"
 )
 
 type KeyFamily int
@@ -133,4 +136,74 @@ func (ka KeyType) String() string {
 	default:
 		return fmt.Sprintf("unknown(%d)", ka)
 	}
+}
+
+func (ka KeyType) Check() error {
+	if strings.HasPrefix(ka.String(), "unknown") {
+		return fmt.Errorf("unknown key type: %s", ka.String())
+	}
+	return nil
+}
+
+type info struct {
+	family  KeyFamily
+	hashAlg tpm2.TPMIAlgHash
+	size    int              // specific to RSA key
+	curveID tpm2.TPMECCCurve // specific to ECC key
+}
+
+var mapKtyToInfo = map[KeyType]info{
+	RSA2048:     {family: RSA, hashAlg: tpm2.TPMAlgSHA256, size: 2048},
+	RSA3072:     {family: RSA, hashAlg: tpm2.TPMAlgSHA384, size: 3072},
+	RSA4096:     {family: RSA, hashAlg: tpm2.TPMAlgSHA512, size: 4096},
+	ECCNISTP256: {family: ECC, hashAlg: tpm2.TPMAlgSHA256, curveID: tpm2.TPMECCNistP256},
+	ECCNISTP384: {family: ECC, hashAlg: tpm2.TPMAlgSHA384, curveID: tpm2.TPMECCNistP384},
+	ECCNISTP521: {family: ECC, hashAlg: tpm2.TPMAlgSHA512, curveID: tpm2.TPMECCNistP521},
+	ECCSM2P256:  {family: ECC, hashAlg: tpm2.TPMAlgSHA256, curveID: tpm2.TPMECCSM2P256},
+}
+
+func NewApplicationKeyTemplate(optionalConfig ...KeyConfig) (tpm2.TPMTPublic, error) {
+	nilPublic := tpm2.TPMTPublic{}
+	cfg := utils.OptionalArg(optionalConfig)
+	if err := cfg.CheckAndSetDefault(); err != nil {
+		return nilPublic, err
+	}
+
+	var template tpm2.TPMTPublic
+	info := mapKtyToInfo[cfg.KeyType]
+	switch info.family {
+	case RSA:
+		template = rsaSigningAppKeyTemplate
+		template.NameAlg = info.hashAlg
+		// TODO(lsikidi): support strict scheme (it would require to enrich KeyConfig)
+		params, err := tpmcrypto.NewRSASigKeyParameters(info.size, tpm2.TPMAlgNull)
+		if err != nil {
+			return nilPublic, err
+		}
+		template.Parameters = *params
+	case ECC:
+		template = eccSigningAppKeyTemplate
+		template.NameAlg = info.hashAlg
+		params, err := tpmcrypto.NewECCSigKeyParameters(info.curveID)
+		if err != nil {
+			return nilPublic, err
+		}
+		template.Parameters = *params
+		unique, err := tpmcrypto.NewECCKeyUnique(info.curveID)
+		if err != nil {
+			return nilPublic, err
+		}
+		template.Unique = *unique
+	}
+
+	return template, nil
+}
+
+// MustApplicationKeyTemplate is like [NewApplicationKeyTemplate] but panics if an error occurs.
+func MustApplicationKeyTemplate(optionalConfig ...KeyConfig) tpm2.TPMTPublic {
+	template, err := NewApplicationKeyTemplate(optionalConfig...)
+	if err != nil {
+		panic(err)
+	}
+	return template
 }
