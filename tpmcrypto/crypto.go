@@ -245,6 +245,28 @@ func GetDigest(data []byte, hash crypto.Hash) ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
+// GetDigestFromHashAlg computes the digest of the provided data using the specified TPM hash algorithm.
+//
+// Example:
+//
+//	digest, err := tpmcrypto.GetDigestFromHashAlg(data, tpm2.TPMAlgSHA256)
+func GetDigestFromHashAlg(data []byte, hashAlg tpm2.TPMIAlgHash) ([]byte, error) {
+	var hash crypto.Hash
+	switch hashAlg {
+	case tpm2.TPMAlgSHA1:
+		hash = crypto.SHA1
+	case tpm2.TPMAlgSHA256:
+		hash = crypto.SHA256
+	case tpm2.TPMAlgSHA384:
+		hash = crypto.SHA384
+	case tpm2.TPMAlgSHA512:
+		hash = crypto.SHA512
+	default:
+		return nil, fmt.Errorf("unsupported hash algorithm: 0x%x", hashAlg)
+	}
+	return GetDigest(data, hash)
+}
+
 // GetSigSchemeFromPublic extracts the signature scheme from a [tpm2.TPMTPublic] structure.
 //
 // Example:
