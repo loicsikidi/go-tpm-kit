@@ -504,3 +504,18 @@ func (c *HmacConfig) CheckAndSetDefault() error {
 	}
 	return nil
 }
+
+type KeyConfig struct {
+	// KeyType specifies the type of key to be used.
+	KeyType KeyType
+}
+
+func (c *KeyConfig) CheckAndSetDefault() error {
+	if c.KeyType == UnspecifiedAlgo {
+		c.KeyType = ECCNISTP256
+	}
+	if err := c.KeyType.Check(); err != nil {
+		return err
+	}
+	return nil
+}

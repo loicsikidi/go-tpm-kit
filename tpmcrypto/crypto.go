@@ -484,20 +484,29 @@ func NewRSASigKeyParameters(size int, scheme tpm2.TPMAlgID) (*tpm2.TPMUPublicPar
 //
 //	params, err := tpmcrypto.NewECCSigKeyParameters(tpm2.TPMECCNistP256)
 func NewECCSigKeyParameters(curve tpm2.TPMECCCurve) (*tpm2.TPMUPublicParms, error) {
-	var hashAlg tpm2.TPMAlgID
+	var (
+		scheme  tpm2.TPMAlgID
+		hashAlg tpm2.TPMAlgID
+	)
 
 	switch curve {
 	case tpm2.TPMECCNistP256:
+		scheme = tpm2.TPMAlgECDSA
 		hashAlg = tpm2.TPMAlgSHA256
 	case tpm2.TPMECCNistP384:
+		scheme = tpm2.TPMAlgECDSA
 		hashAlg = tpm2.TPMAlgSHA384
 	case tpm2.TPMECCNistP521:
+		scheme = tpm2.TPMAlgECDSA
 		hashAlg = tpm2.TPMAlgSHA512
+	case tpm2.TPMECCSM2P256:
+		scheme = tpm2.TPMAlgSM2
+		hashAlg = tpm2.TPMAlgSHA256
 	default:
 		return nil, fmt.Errorf("unsupported curve id: %#x", curve)
 	}
 
-	details, err := newSigKeyParamDetails(tpm2.TPMAlgECDSA, hashAlg)
+	details, err := newSigKeyParamDetails(scheme, hashAlg)
 	if err != nil {
 		return nil, err
 	}
@@ -506,7 +515,7 @@ func NewECCSigKeyParameters(curve tpm2.TPMECCCurve) (*tpm2.TPMUPublicParms, erro
 		tpm2.TPMAlgECC,
 		&tpm2.TPMSECCParms{
 			Scheme: tpm2.TPMTECCScheme{
-				Scheme:  tpm2.TPMAlgECDSA,
+				Scheme:  scheme,
 				Details: details,
 			},
 			CurveID: curve,
@@ -553,7 +562,7 @@ func NewHMACParameters(hashAlg tpm2.TPMAlgID) (*tpm2.TPMUPublicParms, error) {
 func NewECCKeyUnique(curveID tpm2.TPMECCCurve) (*tpm2.TPMUPublicID, error) {
 	var eccPointSize int
 	switch curveID {
-	case tpm2.TPMECCNistP256:
+	case tpm2.TPMECCNistP256, tpm2.TPMECCSM2P256:
 		eccPointSize = 32
 	case tpm2.TPMECCNistP384:
 		eccPointSize = 48

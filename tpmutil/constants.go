@@ -389,3 +389,42 @@ var (
 		),
 	}
 )
+
+// Predefined templates (public area) for application keys
+//
+// These templates are used by [NewApplicationKeyTemplate] to produce
+// templates depending on the key type.
+var (
+	eccSigningAppKeyTemplate = tpm2.TPMTPublic{
+		Type: tpm2.TPMAlgECC,
+		ObjectAttributes: tpm2.TPMAObject{
+			FixedTPM:             true,
+			STClear:              false,
+			FixedParent:          true,
+			SensitiveDataOrigin:  true,
+			UserWithAuth:         true,
+			AdminWithPolicy:      false,
+			NoDA:                 true,
+			EncryptedDuplication: false,
+			Restricted:           false,
+			Decrypt:              false,
+			SignEncrypt:          true,
+		},
+	}
+	rsaSigningAppKeyTemplate = tpm2.TPMTPublic{
+		Type: tpm2.TPMAlgRSA,
+		ObjectAttributes: tpm2.TPMAObject{
+			FixedTPM:             true,
+			STClear:              false,
+			FixedParent:          true,
+			SensitiveDataOrigin:  true,
+			UserWithAuth:         true,
+			AdminWithPolicy:      false,
+			NoDA:                 true,
+			EncryptedDuplication: false,
+			Restricted:           false,
+			Decrypt:              true,
+			SignEncrypt:          true,
+		},
+	}
+)

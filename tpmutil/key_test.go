@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
@@ -513,4 +514,195 @@ func indexSubstring(s, substr string) int {
 		}
 	}
 	return -1
+}
+
+// TestNewApplicationKeyTemplate verifies that [tpmutil.NewApplicationKeyTemplate]
+// generates valid TPM key templates and that these templates can be used to
+// successfully create keys in the TPM.
+//
+// Note: RSA 3072/4096 and ECC SM2 P-256 are not tested as they are not fully
+// supported by the TPM simulator (either size limitations or unsupported
+// signature schemes).
+func TestNewApplicationKeyTemplate(t *testing.T) {
+	thetpm := testutil.OpenSimulator(t)
+
+	// Create SRK first
+	srkHandle, err := tpmutil.GetSKRHandle(thetpm, tpmutil.ParentConfig{})
+	if err != nil {
+		t.Fatalf("failed to get SRK handle: %v", err)
+	}
+
+	tests := []struct {
+		name          string
+		config        tpmutil.KeyConfig
+		wantErr       bool
+		wantErrSubstr string
+		validate      func(t *testing.T, tmpl tpm2.TPMTPublic)
+	}{
+		{
+			name:    "default config (ECC NIST P-256)",
+			config:  tpmutil.KeyConfig{},
+			wantErr: false,
+			validate: func(t *testing.T, tmpl tpm2.TPMTPublic) {
+				if tmpl.Type != tpm2.TPMAlgECC {
+					t.Errorf("expected Type = TPMAlgECC, got %v", tmpl.Type)
+				}
+				if tmpl.NameAlg != tpm2.TPMAlgSHA256 {
+					t.Errorf("expected NameAlg = TPMAlgSHA256, got %v", tmpl.NameAlg)
+				}
+				eccParams, err := tmpl.Parameters.ECCDetail()
+				if err != nil {
+					t.Fatalf("failed to get ECC details: %v", err)
+				}
+				if eccParams.CurveID != tpm2.TPMECCNistP256 {
+					t.Errorf("expected CurveID = TPMECCNistP256, got %v", eccParams.CurveID)
+				}
+				if !tmpl.ObjectAttributes.SignEncrypt {
+					t.Error("expected SignEncrypt to be true")
+				}
+				if tmpl.ObjectAttributes.Decrypt {
+					t.Error("expected Decrypt to be false")
+				}
+			},
+		},
+		{
+			name: "RSA 2048",
+			config: tpmutil.KeyConfig{
+				KeyType: tpmutil.RSA2048,
+			},
+			wantErr: false,
+			validate: func(t *testing.T, tmpl tpm2.TPMTPublic) {
+				if tmpl.Type != tpm2.TPMAlgRSA {
+					t.Errorf("expected Type = TPMAlgRSA, got %v", tmpl.Type)
+				}
+				if tmpl.NameAlg != tpm2.TPMAlgSHA256 {
+					t.Errorf("expected NameAlg = TPMAlgSHA256, got %v", tmpl.NameAlg)
+				}
+				rsaParams, err := tmpl.Parameters.RSADetail()
+				if err != nil {
+					t.Fatalf("failed to get RSA details: %v", err)
+				}
+				if rsaParams.KeyBits != 2048 {
+					t.Errorf("expected KeyBits = 2048, got %v", rsaParams.KeyBits)
+				}
+				if !tmpl.ObjectAttributes.SignEncrypt {
+					t.Error("expected SignEncrypt to be true")
+				}
+				if !tmpl.ObjectAttributes.Decrypt {
+					t.Error("expected Decrypt to be true")
+				}
+			},
+		},
+		{
+			name: "ECC NIST P-256",
+			config: tpmutil.KeyConfig{
+				KeyType: tpmutil.ECCNISTP256,
+			},
+			wantErr: false,
+			validate: func(t *testing.T, tmpl tpm2.TPMTPublic) {
+				if tmpl.Type != tpm2.TPMAlgECC {
+					t.Errorf("expected Type = TPMAlgECC, got %v", tmpl.Type)
+				}
+				if tmpl.NameAlg != tpm2.TPMAlgSHA256 {
+					t.Errorf("expected NameAlg = TPMAlgSHA256, got %v", tmpl.NameAlg)
+				}
+				eccParams, err := tmpl.Parameters.ECCDetail()
+				if err != nil {
+					t.Fatalf("failed to get ECC details: %v", err)
+				}
+				if eccParams.CurveID != tpm2.TPMECCNistP256 {
+					t.Errorf("expected CurveID = TPMECCNistP256, got %v", eccParams.CurveID)
+				}
+			},
+		},
+		{
+			name: "ECC NIST P-384",
+			config: tpmutil.KeyConfig{
+				KeyType: tpmutil.ECCNISTP384,
+			},
+			wantErr: false,
+			validate: func(t *testing.T, tmpl tpm2.TPMTPublic) {
+				if tmpl.Type != tpm2.TPMAlgECC {
+					t.Errorf("expected Type = TPMAlgECC, got %v", tmpl.Type)
+				}
+				if tmpl.NameAlg != tpm2.TPMAlgSHA384 {
+					t.Errorf("expected NameAlg = TPMAlgSHA384, got %v", tmpl.NameAlg)
+				}
+				eccParams, err := tmpl.Parameters.ECCDetail()
+				if err != nil {
+					t.Fatalf("failed to get ECC details: %v", err)
+				}
+				if eccParams.CurveID != tpm2.TPMECCNistP384 {
+					t.Errorf("expected CurveID = TPMECCNistP384, got %v", eccParams.CurveID)
+				}
+			},
+		},
+		{
+			name: "ECC NIST P-521",
+			config: tpmutil.KeyConfig{
+				KeyType: tpmutil.ECCNISTP521,
+			},
+			wantErr: false,
+			validate: func(t *testing.T, tmpl tpm2.TPMTPublic) {
+				if tmpl.Type != tpm2.TPMAlgECC {
+					t.Errorf("expected Type = TPMAlgECC, got %v", tmpl.Type)
+				}
+				if tmpl.NameAlg != tpm2.TPMAlgSHA512 {
+					t.Errorf("expected NameAlg = TPMAlgSHA512, got %v", tmpl.NameAlg)
+				}
+				eccParams, err := tmpl.Parameters.ECCDetail()
+				if err != nil {
+					t.Fatalf("failed to get ECC details: %v", err)
+				}
+				if eccParams.CurveID != tpm2.TPMECCNistP521 {
+					t.Errorf("expected CurveID = TPMECCNistP521, got %v", eccParams.CurveID)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpl, err := tpmutil.NewApplicationKeyTemplate(tt.config)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("NewApplicationKeyTemplate() expected error, got nil")
+				}
+				if tt.wantErrSubstr != "" && !containsSubstring(err.Error(), tt.wantErrSubstr) {
+					t.Errorf("NewApplicationKeyTemplate() error = %q, want substring %q", err.Error(), tt.wantErrSubstr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("NewApplicationKeyTemplate() unexpected error: %v", err)
+			}
+
+			if tt.validate != nil {
+				tt.validate(t, tmpl)
+			}
+
+			// Test that the template can actually be used to create a key
+			keyHandle, err := tpmutil.Create(thetpm, tpmutil.CreateConfig{
+				ParentHandle: srkHandle,
+				InPublic:     tmpl,
+			})
+			if err != nil {
+				t.Fatalf("failed to create key with template: %v", err)
+			}
+			defer keyHandle.Close()
+
+			// Verify the created key matches expected type
+			gotKeyType, err := tpmutil.PublicToKeyType(*keyHandle.Public())
+			if err != nil {
+				t.Fatalf("failed to get key type from created key: %v", err)
+			}
+			expectedKeyType := tt.config.KeyType
+			if expectedKeyType == tpmutil.UnspecifiedAlgo {
+				expectedKeyType = tpmutil.ECCNISTP256
+			}
+			if gotKeyType != expectedKeyType {
+				t.Errorf("created key type = %v, want %v", gotKeyType, expectedKeyType)
+			}
+		})
+	}
 }
