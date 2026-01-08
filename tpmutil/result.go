@@ -243,6 +243,25 @@ func (r CreatePrimaryResult) CreationInfo() *tpm2.TPMSCreationData {
 	return info
 }
 
+// Handle returns a [Handle] representing the created primary object.
+//
+// Example:
+//
+//	result := CreatePrimaryResult{...}
+//	handle := result.Handle()
+func (r CreatePrimaryResult) Handle() Handle {
+	public, err := r.OutPublic.Contents()
+	if err != nil {
+		return nil
+	}
+
+	h := &tpm2.NamedHandle{Handle: r.ObjectHandle, Name: r.Name}
+	return &tpmHandle{
+		handle: h,
+		public: public,
+	}
+}
+
 // marshaledCreatePrimaryResult is the JSON representation of [CreatePrimaryResult].
 //
 // Note: ObjectHandle is not marshaled as it is a transient handle.

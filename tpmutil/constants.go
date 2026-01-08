@@ -390,9 +390,10 @@ var (
 	}
 )
 
-// Predefined templates (public area) for application keys
+// Predefined private templates (public area) for application keys and attestation
+// keys (AK).
 //
-// These templates are used by [NewApplicationKeyTemplate] to produce
+// These templates are used by [NewApplicationKeyTemplate] and [NewAKTemplate] to produce
 // templates depending on the key type.
 var (
 	eccSigningAppKeyTemplate = tpm2.TPMTPublic{
@@ -424,6 +425,38 @@ var (
 			EncryptedDuplication: false,
 			Restricted:           false,
 			Decrypt:              true,
+			SignEncrypt:          true,
+		},
+	}
+	eccAKTemplate = tpm2.TPMTPublic{
+		Type: tpm2.TPMAlgECC,
+		ObjectAttributes: tpm2.TPMAObject{
+			FixedTPM:             true,
+			STClear:              false,
+			FixedParent:          true,
+			SensitiveDataOrigin:  true,
+			UserWithAuth:         true,
+			AdminWithPolicy:      false,
+			NoDA:                 true,
+			EncryptedDuplication: false,
+			Restricted:           true,
+			Decrypt:              false,
+			SignEncrypt:          true,
+		},
+	}
+	rsaAKTemplate = tpm2.TPMTPublic{
+		Type: tpm2.TPMAlgRSA,
+		ObjectAttributes: tpm2.TPMAObject{
+			FixedTPM:             true,
+			STClear:              false,
+			FixedParent:          true,
+			SensitiveDataOrigin:  true,
+			UserWithAuth:         true,
+			AdminWithPolicy:      false,
+			NoDA:                 true,
+			EncryptedDuplication: false,
+			Restricted:           true,
+			Decrypt:              false,
 			SignEncrypt:          true,
 		},
 	}
