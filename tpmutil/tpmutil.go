@@ -679,6 +679,86 @@ func PersistEK(t transport.TPM, optionalCfg ...EKParentConfig) (Handle, error) {
 	return persistedHandle, nil
 }
 
+// Persist makes a transient object persistent at the specified handle.
+//
+// This function wraps the TPM2_EvictControl command to persist a transient object
+// to a persistent handle in the TPM's non-volatile storage.
+//
+// If Force is true, the existing key is evicted before persisting the new one.
+//
+// Example:
+//
+//	// Create a transient primary key
+//	eccTemplate := tpmutil.ECCSRKTemplate
+//	transientHandle, err := tpmutil.CreatePrimary(tpm, tpmutil.CreatePrimaryConfig{
+//		PrimaryHandle: tpm2.TPMRHOwner,
+//		InPublic:      eccTemplate,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer transientHandle.Close()
+//
+//	// Persist the transient key
+//	persistentHandle, err := tpmutil.Persist(tpm, tpmutil.PersistConfig{
+//		TransientHandle:  transientHandle,
+//		PersistentHandle: tpmutil.NewHandle(tpmkit.SRKHandle),
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Printf("Persisted handle: 0x%x\n", persistentHandle.Handle())
+//
+// Note: If cfg is nil, default configuration is used.
+func Persist(t transport.TPM, optionalCfg ...PersistConfig) (Handle, error) {
+	cfg := utils.OptionalArg(optionalCfg)
+	if err := cfg.CheckAndSetDefault(); err != nil {
+		return nil, err
+	}
+
+	// Check if a key already exists at the target handle
+	readPublicRsp, err := tpm2.ReadPublic{
+		ObjectHandle: cfg.PersistentHandle.Handle(),
+	}.Execute(t)
+	if err == nil {
+		// Key exists at the target handle
+		if !cfg.Force {
+			return nil, fmt.Errorf("key already exists at handle 0x%x (use Force to overwrite)", cfg.PersistentHandle.Handle())
+		}
+
+		// Remove the existing key
+		existingHandle := NewHandle(&tpm2.NamedHandle{
+			Handle: cfg.PersistentHandle.Handle(),
+			Name:   readPublicRsp.Name,
+		})
+		_, evictErr := tpm2.EvictControl{
+			Auth:             ToAuthHandle(NewHandle(cfg.Hierarchy), cfg.Auth),
+			ObjectHandle:     existingHandle,
+			PersistentHandle: cfg.PersistentHandle.Handle(),
+		}.Execute(t)
+		if evictErr != nil {
+			return nil, fmt.Errorf("failed to evict existing key at handle 0x%x: %w", cfg.PersistentHandle.Handle(), evictErr)
+		}
+	}
+
+	_, err = tpm2.EvictControl{
+		Auth:             ToAuthHandle(NewHandle(cfg.Hierarchy), cfg.Auth),
+		ObjectHandle:     cfg.TransientHandle,
+		PersistentHandle: cfg.PersistentHandle.Handle(),
+	}.Execute(t)
+	if err != nil {
+		return nil, fmt.Errorf("EvictControl failed: %w", err)
+	}
+
+	// Return the persistent handle
+	persistedHandle := NewHandle(&tpm2.NamedHandle{
+		Handle: cfg.PersistentHandle.Handle(),
+		Name:   cfg.TransientHandle.Name(),
+	})
+
+	return persistedHandle, nil
+}
+
 // CreatePrimary creates a primary key in the TPM and returns a [HandleCloser].
 //
 // Example:

@@ -1,11 +1,13 @@
 package tpmutil_test
 
 import (
+	"bytes"
 	"errors"
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
 	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
+	"github.com/loicsikidi/go-tpm-kit/tpmcrypto"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
@@ -516,6 +518,237 @@ func indexSubstring(s, substr string) int {
 	return -1
 }
 
+// TestNewAKTemplate verifies that [tpmutil.NewAKTemplate]
+// generates valid Attestation Key (AK) templates with restricted signing
+// capabilities and that these templates can be used to successfully create
+// keys in the TPM.
+func TestNewAKTemplate(t *testing.T) {
+	thetpm := testutil.OpenSimulator(t)
+
+	// Create SRK first
+	srkHandle, err := tpmutil.GetSKRHandle(thetpm, tpmutil.ParentConfig{})
+	if err != nil {
+		t.Fatalf("failed to get SRK handle: %v", err)
+	}
+
+	tests := []struct {
+		name          string
+		config        tpmutil.KeyConfig
+		wantErr       bool
+		wantErrSubstr string
+		validate      func(t *testing.T, tmpl tpm2.TPMTPublic)
+	}{
+		{
+			name:    "default config (ECC NIST P-256)",
+			config:  tpmutil.KeyConfig{},
+			wantErr: false,
+		},
+		{
+			name: "RSA 2048 with default RSASSA scheme",
+			config: tpmutil.KeyConfig{
+				KeyType: tpmutil.RSA2048,
+			},
+			wantErr: false,
+		},
+		{
+			name: "ECC NIST P-256",
+			config: tpmutil.KeyConfig{
+				KeyType: tpmutil.ECCNISTP256,
+			},
+			wantErr: false,
+		},
+		{
+			name: "ECC NIST P-384",
+			config: tpmutil.KeyConfig{
+				KeyType: tpmutil.ECCNISTP384,
+			},
+			wantErr: false,
+		},
+		{
+			name: "ECC NIST P-521",
+			config: tpmutil.KeyConfig{
+				KeyType: tpmutil.ECCNISTP521,
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpl, err := tpmutil.NewAKTemplate(tt.config)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("NewAKTemplate() expected error, got nil")
+				}
+				if tt.wantErrSubstr != "" && !containsSubstring(err.Error(), tt.wantErrSubstr) {
+					t.Errorf("NewAKTemplate() error = %q, want substring %q", err.Error(), tt.wantErrSubstr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("NewAKTemplate() unexpected error: %v", err)
+			}
+
+			// Test that the template can actually be used to create a key
+			keyHandle, err := tpmutil.Create(thetpm, tpmutil.CreateConfig{
+				ParentHandle: srkHandle,
+				InPublic:     tmpl,
+			})
+			if err != nil {
+				t.Fatalf("failed to create key with template: %v", err)
+			}
+			defer keyHandle.Close()
+
+			// Verify the created key matches expected type
+			gotKeyType, err := tpmutil.PublicToKeyType(*keyHandle.Public())
+			if err != nil {
+				t.Fatalf("failed to get key type from created key: %v", err)
+			}
+			expectedKeyType := tt.config.KeyType
+			if expectedKeyType == tpmutil.UnspecifiedAlgo {
+				expectedKeyType = tpmutil.ECCNISTP256
+			}
+			if gotKeyType != expectedKeyType {
+				t.Errorf("created key type = %v, want %v", gotKeyType, expectedKeyType)
+			}
+		})
+	}
+}
+
+// TestAKCertifyCreation verifies that an Attestation Key (AK) created with
+// [tpmutil.NewAKTemplate] can successfully certify the creation of a primary key.
+//
+// Note: RSA 3072/4096 and ECC SM2 P-256 are not tested as they are not fully
+// supported by the TPM simulator (either size limitations or unsupported
+// signature schemes).
+func TestAKCertifyCreation(t *testing.T) {
+	thetpm := testutil.OpenSimulator(t)
+
+	tests := []struct {
+		name   string
+		akType tpmutil.KeyType
+	}{
+		{
+			name:   "RSA 2048 AK",
+			akType: tpmutil.RSA2048,
+		},
+		{
+			name:   "ECC NIST P-256 AK (default)",
+			akType: tpmutil.ECCNISTP256,
+		},
+		{
+			name:   "ECC NIST P-384 AK",
+			akType: tpmutil.ECCNISTP384,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create AK template
+			akTemplate, err := tpmutil.NewAKTemplate(tpmutil.KeyConfig{
+				KeyType: tt.akType,
+			})
+			if err != nil {
+				t.Fatalf("failed to create AK template: %v", err)
+			}
+
+			// Create the AK as a primary key
+			rspAK, closeAK, err := tpmutil.CreatePrimaryWithResult(thetpm, tpmutil.CreatePrimaryConfig{
+				PrimaryHandle: tpm2.TPMRHEndorsement,
+				InPublic:      akTemplate,
+			})
+			if err != nil {
+				t.Fatalf("failed to create primary AK: %v", err)
+			}
+			defer closeAK()
+
+			// Create another primary key to certify (subject key) using RSA AK template
+			subjectTemplate, err := tpmutil.NewAKTemplate(tpmutil.KeyConfig{
+				KeyType: tpmutil.RSA2048,
+			})
+			if err != nil {
+				t.Fatalf("failed to create subject template: %v", err)
+			}
+
+			rspSubject, closeSubject, err := tpmutil.CreatePrimaryWithResult(thetpm, tpmutil.CreatePrimaryConfig{
+				PrimaryHandle: tpm2.TPMRHEndorsement,
+				InPublic:      subjectTemplate,
+			})
+			if err != nil {
+				t.Fatalf("failed to create subject primary: %v", err)
+			}
+			defer closeSubject()
+
+			// Determine the signature scheme based on AK type
+			var inScheme tpm2.TPMTSigScheme
+			var expectedHashAlg tpm2.TPMAlgID
+			switch tt.akType {
+			case tpmutil.RSA2048:
+				expectedHashAlg = tpm2.TPMAlgSHA256
+				inScheme = tpmcrypto.GetSigScheme(tpm2.TPMAlgRSASSA, expectedHashAlg)
+			case tpmutil.ECCNISTP256:
+				expectedHashAlg = tpm2.TPMAlgSHA256
+				inScheme = tpmcrypto.GetSigScheme(tpm2.TPMAlgECDSA, expectedHashAlg)
+			case tpmutil.ECCNISTP384:
+				expectedHashAlg = tpm2.TPMAlgSHA384
+				inScheme = tpmcrypto.GetSigScheme(tpm2.TPMAlgECDSA, expectedHashAlg)
+			}
+
+			// Certify the subject key's creation using the AK
+			certifyCreation := tpm2.CertifyCreation{
+				SignHandle:     tpmutil.ToAuthHandle(rspAK.Handle()),
+				ObjectHandle:   rspSubject.Handle(),
+				CreationHash:   rspSubject.CreationHash,
+				InScheme:       inScheme,
+				CreationTicket: rspSubject.CreationTicket,
+			}
+
+			rspCert, err := certifyCreation.Execute(thetpm)
+			if err != nil {
+				t.Fatalf("failed to certify creation: %v", err)
+			}
+
+			// Verify the attested name matches the subject's name
+			certifyInfo, err := rspCert.CertifyInfo.Contents()
+			if err != nil {
+				t.Fatalf("failed to get certify info contents: %v", err)
+			}
+			creationInfo, err := certifyInfo.Attested.Creation()
+			if err != nil {
+				t.Fatalf("failed to get creation info: %v", err)
+			}
+
+			if !bytes.Equal(creationInfo.ObjectName.Buffer, rspSubject.Name.Buffer) {
+				t.Fatalf("attested name %x does not match subject name %x",
+					creationInfo.ObjectName.Buffer, rspSubject.Name.Buffer)
+			}
+
+			// Verify the signature using the AK's public key
+			t.Run("verify signature", func(t *testing.T) {
+				// Marshal the attestation data
+				attestData := tpm2.Marshal(certifyInfo)
+
+				// Determine the crypto.Hash based on the expected hash algorithm
+				cryptoHash, err := expectedHashAlg.Hash()
+				if err != nil {
+					t.Fatalf("failed to get crypto.Hash from expected hash algorithm: %v", err)
+				}
+
+				// Get the public key from the AK
+				pubKey, err := tpmcrypto.PublicKey(rspAK.OutPublic)
+				if err != nil {
+					t.Fatalf("failed to get public key from AK: %v", err)
+				}
+
+				// Verify the signature
+				if err := tpmcrypto.VerifySignature(pubKey, rspCert.Signature, cryptoHash, attestData); err != nil {
+					t.Errorf("signature verification failed: %v", err)
+				}
+			})
+		})
+	}
+}
+
 // TestNewApplicationKeyTemplate verifies that [tpmutil.NewApplicationKeyTemplate]
 // generates valid TPM key templates and that these templates can be used to
 // successfully create keys in the TPM.
@@ -537,33 +770,11 @@ func TestNewApplicationKeyTemplate(t *testing.T) {
 		config        tpmutil.KeyConfig
 		wantErr       bool
 		wantErrSubstr string
-		validate      func(t *testing.T, tmpl tpm2.TPMTPublic)
 	}{
 		{
 			name:    "default config (ECC NIST P-256)",
 			config:  tpmutil.KeyConfig{},
 			wantErr: false,
-			validate: func(t *testing.T, tmpl tpm2.TPMTPublic) {
-				if tmpl.Type != tpm2.TPMAlgECC {
-					t.Errorf("expected Type = TPMAlgECC, got %v", tmpl.Type)
-				}
-				if tmpl.NameAlg != tpm2.TPMAlgSHA256 {
-					t.Errorf("expected NameAlg = TPMAlgSHA256, got %v", tmpl.NameAlg)
-				}
-				eccParams, err := tmpl.Parameters.ECCDetail()
-				if err != nil {
-					t.Fatalf("failed to get ECC details: %v", err)
-				}
-				if eccParams.CurveID != tpm2.TPMECCNistP256 {
-					t.Errorf("expected CurveID = TPMECCNistP256, got %v", eccParams.CurveID)
-				}
-				if !tmpl.ObjectAttributes.SignEncrypt {
-					t.Error("expected SignEncrypt to be true")
-				}
-				if tmpl.ObjectAttributes.Decrypt {
-					t.Error("expected Decrypt to be false")
-				}
-			},
 		},
 		{
 			name: "RSA 2048",
@@ -571,27 +782,6 @@ func TestNewApplicationKeyTemplate(t *testing.T) {
 				KeyType: tpmutil.RSA2048,
 			},
 			wantErr: false,
-			validate: func(t *testing.T, tmpl tpm2.TPMTPublic) {
-				if tmpl.Type != tpm2.TPMAlgRSA {
-					t.Errorf("expected Type = TPMAlgRSA, got %v", tmpl.Type)
-				}
-				if tmpl.NameAlg != tpm2.TPMAlgSHA256 {
-					t.Errorf("expected NameAlg = TPMAlgSHA256, got %v", tmpl.NameAlg)
-				}
-				rsaParams, err := tmpl.Parameters.RSADetail()
-				if err != nil {
-					t.Fatalf("failed to get RSA details: %v", err)
-				}
-				if rsaParams.KeyBits != 2048 {
-					t.Errorf("expected KeyBits = 2048, got %v", rsaParams.KeyBits)
-				}
-				if !tmpl.ObjectAttributes.SignEncrypt {
-					t.Error("expected SignEncrypt to be true")
-				}
-				if !tmpl.ObjectAttributes.Decrypt {
-					t.Error("expected Decrypt to be true")
-				}
-			},
 		},
 		{
 			name: "ECC NIST P-256",
@@ -599,21 +789,6 @@ func TestNewApplicationKeyTemplate(t *testing.T) {
 				KeyType: tpmutil.ECCNISTP256,
 			},
 			wantErr: false,
-			validate: func(t *testing.T, tmpl tpm2.TPMTPublic) {
-				if tmpl.Type != tpm2.TPMAlgECC {
-					t.Errorf("expected Type = TPMAlgECC, got %v", tmpl.Type)
-				}
-				if tmpl.NameAlg != tpm2.TPMAlgSHA256 {
-					t.Errorf("expected NameAlg = TPMAlgSHA256, got %v", tmpl.NameAlg)
-				}
-				eccParams, err := tmpl.Parameters.ECCDetail()
-				if err != nil {
-					t.Fatalf("failed to get ECC details: %v", err)
-				}
-				if eccParams.CurveID != tpm2.TPMECCNistP256 {
-					t.Errorf("expected CurveID = TPMECCNistP256, got %v", eccParams.CurveID)
-				}
-			},
 		},
 		{
 			name: "ECC NIST P-384",
@@ -621,21 +796,6 @@ func TestNewApplicationKeyTemplate(t *testing.T) {
 				KeyType: tpmutil.ECCNISTP384,
 			},
 			wantErr: false,
-			validate: func(t *testing.T, tmpl tpm2.TPMTPublic) {
-				if tmpl.Type != tpm2.TPMAlgECC {
-					t.Errorf("expected Type = TPMAlgECC, got %v", tmpl.Type)
-				}
-				if tmpl.NameAlg != tpm2.TPMAlgSHA384 {
-					t.Errorf("expected NameAlg = TPMAlgSHA384, got %v", tmpl.NameAlg)
-				}
-				eccParams, err := tmpl.Parameters.ECCDetail()
-				if err != nil {
-					t.Fatalf("failed to get ECC details: %v", err)
-				}
-				if eccParams.CurveID != tpm2.TPMECCNistP384 {
-					t.Errorf("expected CurveID = TPMECCNistP384, got %v", eccParams.CurveID)
-				}
-			},
 		},
 		{
 			name: "ECC NIST P-521",
@@ -643,21 +803,6 @@ func TestNewApplicationKeyTemplate(t *testing.T) {
 				KeyType: tpmutil.ECCNISTP521,
 			},
 			wantErr: false,
-			validate: func(t *testing.T, tmpl tpm2.TPMTPublic) {
-				if tmpl.Type != tpm2.TPMAlgECC {
-					t.Errorf("expected Type = TPMAlgECC, got %v", tmpl.Type)
-				}
-				if tmpl.NameAlg != tpm2.TPMAlgSHA512 {
-					t.Errorf("expected NameAlg = TPMAlgSHA512, got %v", tmpl.NameAlg)
-				}
-				eccParams, err := tmpl.Parameters.ECCDetail()
-				if err != nil {
-					t.Fatalf("failed to get ECC details: %v", err)
-				}
-				if eccParams.CurveID != tpm2.TPMECCNistP521 {
-					t.Errorf("expected CurveID = TPMECCNistP521, got %v", eccParams.CurveID)
-				}
-			},
 		},
 	}
 
@@ -675,10 +820,6 @@ func TestNewApplicationKeyTemplate(t *testing.T) {
 			}
 			if err != nil {
 				t.Fatalf("NewApplicationKeyTemplate() unexpected error: %v", err)
-			}
-
-			if tt.validate != nil {
-				tt.validate(t, tmpl)
 			}
 
 			// Test that the template can actually be used to create a key

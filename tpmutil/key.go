@@ -162,27 +162,69 @@ var mapKtyToInfo = map[KeyType]info{
 	ECCSM2P256:  {family: ECC, hashAlg: tpm2.TPMAlgSHA256, curveID: tpm2.TPMECCSM2P256},
 }
 
+// NewApplicationKeyTemplate creates a new TPM public key template for application keys.
 func NewApplicationKeyTemplate(optionalConfig ...KeyConfig) (tpm2.TPMTPublic, error) {
-	nilPublic := tpm2.TPMTPublic{}
 	cfg := utils.OptionalArg(optionalConfig)
 	if err := cfg.CheckAndSetDefault(); err != nil {
-		return nilPublic, err
+		return tpm2.TPMTPublic{}, err
+	}
+	return newKeyTemplate(cfg, map[KeyFamily]tpm2.TPMTPublic{RSA: rsaSigningAppKeyTemplate, ECC: eccSigningAppKeyTemplate})
+}
+
+// MustApplicationKeyTemplate is like [NewApplicationKeyTemplate] but panics if an error occurs.
+func MustApplicationKeyTemplate(optionalConfig ...KeyConfig) tpm2.TPMTPublic {
+	template, err := NewApplicationKeyTemplate(optionalConfig...)
+	if err != nil {
+		panic(err)
+	}
+	return template
+}
+
+// NewAKTemplate creates a new TPM public key template for Attestation Keys (AK).
+//
+// For RSA AKs, if no scheme is specified (TPMAlgNull), TPMAlgRSASSA is used by default
+// since restricted signing keys require a specific signature scheme.
+func NewAKTemplate(optionalConfig ...KeyConfig) (tpm2.TPMTPublic, error) {
+	cfg := utils.OptionalArg(optionalConfig)
+	if err := cfg.CheckAndSetDefault(); err != nil {
+		return tpm2.TPMTPublic{}, err
 	}
 
-	var template tpm2.TPMTPublic
+	// For RSA AKs, use RSASSA scheme by default if not specified
+	// Restricted signing keys (AKs) require a specific signature scheme
+	// Note: The zero value of tpm2.TPMAlgID is 0, not tpm2.TPMAlgNull (0x0010)
 	info := mapKtyToInfo[cfg.KeyType]
+	if info.family == RSA && (cfg.Scheme == 0 || cfg.Scheme == tpm2.TPMAlgNull) {
+		cfg.Scheme = tpm2.TPMAlgRSASSA
+	}
+
+	return newKeyTemplate(cfg, map[KeyFamily]tpm2.TPMTPublic{RSA: rsaAKTemplate, ECC: eccAKTemplate})
+}
+
+// MustAKTemplate is like [NewAKTemplate] but panics if an error occurs.
+func MustAKTemplate(optionalConfig ...KeyConfig) tpm2.TPMTPublic {
+	template, err := NewAKTemplate(optionalConfig...)
+	if err != nil {
+		panic(err)
+	}
+	return template
+}
+
+// newKeyTemplate creates a new TPM public key template based on the provided configuration and base templates.
+func newKeyTemplate(cfg KeyConfig, baseTemplates map[KeyFamily]tpm2.TPMTPublic) (tpm2.TPMTPublic, error) {
+	nilPublic := tpm2.TPMTPublic{}
+	info := mapKtyToInfo[cfg.KeyType]
+	template := baseTemplates[info.family]
 	switch info.family {
 	case RSA:
-		template = rsaSigningAppKeyTemplate
 		template.NameAlg = info.hashAlg
-		// TODO(lsikidi): support strict scheme (it would require to enrich KeyConfig)
-		params, err := tpmcrypto.NewRSASigKeyParameters(info.size, tpm2.TPMAlgNull)
+		// Use the scheme from the config, defaulting to TPMAlgNull if not specified
+		params, err := tpmcrypto.NewRSASigKeyParameters(info.size, cfg.Scheme)
 		if err != nil {
 			return nilPublic, err
 		}
 		template.Parameters = *params
 	case ECC:
-		template = eccSigningAppKeyTemplate
 		template.NameAlg = info.hashAlg
 		params, err := tpmcrypto.NewECCSigKeyParameters(info.curveID)
 		if err != nil {
@@ -197,13 +239,4 @@ func NewApplicationKeyTemplate(optionalConfig ...KeyConfig) (tpm2.TPMTPublic, er
 	}
 
 	return template, nil
-}
-
-// MustApplicationKeyTemplate is like [NewApplicationKeyTemplate] but panics if an error occurs.
-func MustApplicationKeyTemplate(optionalConfig ...KeyConfig) tpm2.TPMTPublic {
-	template, err := NewApplicationKeyTemplate(optionalConfig...)
-	if err != nil {
-		panic(err)
-	}
-	return template
 }

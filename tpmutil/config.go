@@ -507,7 +507,17 @@ func (c *HmacConfig) CheckAndSetDefault() error {
 
 type KeyConfig struct {
 	// KeyType specifies the type of key to be used.
+	//
+	// Default: [ECCNISTP256].
 	KeyType KeyType
+	// Scheme specifies the signature/encryption scheme for the key.
+	//
+	// Notes:
+	//   - for RSA keys, valid values include [tpm2.TPMAlgRSASSA], [tpm2.TPMAlgRSAPSS], or [tpm2.TPMAlgNull].
+	//   - for ECC keys, this field is ignored as the scheme is determined by the curve.
+	//
+	// Default: [tpm2.TPMAlgNull] (no specific scheme restriction)
+	Scheme tpm2.TPMAlgID
 }
 
 func (c *KeyConfig) CheckAndSetDefault() error {
@@ -516,6 +526,56 @@ func (c *KeyConfig) CheckAndSetDefault() error {
 	}
 	if err := c.KeyType.Check(); err != nil {
 		return err
+	}
+	if c.Scheme == 0 {
+		c.Scheme = tpm2.TPMAlgNull
+	}
+	return nil
+}
+
+// PersistConfig holds configuration for persisting a transient object to a persistent handle.
+type PersistConfig struct {
+	// TransientHandle is the handle of the transient object to persist.
+	//
+	// Required.
+	TransientHandle Handle
+	// PersistentHandle is the target persistent handle.
+	//
+	// Required.
+	PersistentHandle Handle
+	// Hierarchy specifies which TPM hierarchy to use.
+	//
+	// Default: [tpm2.TPMRHOwner].
+	Hierarchy tpm2.TPMHandle
+	// Auth is the authorization session for the hierarchy.
+	//
+	// Default: [NoAuth].
+	Auth tpm2.Session
+	// Force indicates whether to evict an existing key at the target handle
+	// before persisting the new key.
+	//
+	// Default: false
+	Force bool
+}
+
+func (c *PersistConfig) CheckAndSetDefault() error {
+	if c.TransientHandle == nil {
+		return fmt.Errorf("invalid value: 'TransientHandle' is required")
+	}
+	if c.TransientHandle.Type() != TransientHandle {
+		return fmt.Errorf("invalid value: 'TransientHandle' must be a transient TPM handle (got %v)", c.TransientHandle.Type())
+	}
+	if c.PersistentHandle == nil {
+		return fmt.Errorf("invalid value: 'PersistentHandle' is required")
+	}
+	if c.PersistentHandle.Type() != PersistentHandle {
+		return fmt.Errorf("invalid value: 'PersistentHandle' must be a persistent TPM handle (got %v)", c.PersistentHandle.Type())
+	}
+	if c.Hierarchy == 0 {
+		c.Hierarchy = tpm2.TPMRHOwner
+	}
+	if c.Auth == nil {
+		c.Auth = NoAuth
 	}
 	return nil
 }
