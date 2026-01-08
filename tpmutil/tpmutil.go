@@ -506,22 +506,17 @@ func GetSKRHandle(t transport.TPM, optionalCfg ...ParentConfig) (Handle, error) 
 	defer srkHandle.Close() //nolint:errcheck
 
 	// Make the SRK persistent at the desired handle.
-	_, err = tpm2.EvictControl{
-		Auth:             ToAuthHandle(NewHandle(cfg.Hierarchy), cfg.Auth),
-		ObjectHandle:     srkHandle,
-		PersistentHandle: cfg.Handle.Handle(),
-	}.Execute(t)
+	persistedHandle, err := Persist(t, PersistConfig{
+		Hierarchy:        cfg.Hierarchy,
+		Auth:             cfg.Auth,
+		TransientHandle:  srkHandle,
+		PersistentHandle: cfg.Handle,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("ReadPublic failed (%v), and then EvictControl failed: %v", rerr, err)
+		return nil, fmt.Errorf("ReadPublic failed (%v), and then Persist failed: %v", rerr, err)
 	}
 
-	// Return a handle representing the persistent SRK.
-	final := NewHandle(&tpm2.NamedHandle{
-		Handle: cfg.Handle.Handle(),
-		Name:   srkHandle.Name(),
-	})
-
-	return final, nil
+	return persistedHandle, nil
 }
 
 // GetEKHandle retrieves the Endorsement Key (EK) handle from the TPM.
@@ -612,27 +607,7 @@ func PersistEK(t transport.TPM, optionalCfg ...EKParentConfig) (Handle, error) {
 		return nil, err
 	}
 
-	// Check if a key already exists at the target handle
-	existingHandle, err := GetEKHandle(t, cfg)
-	if err == nil {
-		// Key exists at the target handle
-		if !cfg.Force {
-			return nil, fmt.Errorf("key already exists at handle 0x%x (use Force to overwrite)", cfg.Handle.Handle())
-		}
-
-		// Remove the existing key
-		_, evictErr := tpm2.EvictControl{
-			Auth:             ToAuthHandle(NewHandle(tpm2.TPMRHOwner), NoAuth),
-			ObjectHandle:     existingHandle,
-			PersistentHandle: cfg.Handle.Handle(),
-		}.Execute(t)
-		if evictErr != nil {
-			return nil, fmt.Errorf("failed to evict existing key at handle 0x%x: %w", cfg.Handle.Handle(), evictErr)
-		}
-	}
-
-	var transientHandle tpm2.TPMHandle
-	var name tpm2.TPM2BName
+	var transientHandle Handle
 
 	if cfg.TransientKey == nil {
 		template, err := getEKTemplate(cfg.KeyType, cfg.IsLowRange)
@@ -650,31 +625,23 @@ func PersistEK(t transport.TPM, optionalCfg ...EKParentConfig) (Handle, error) {
 		}
 		defer ekHandle.Close() //nolint:errcheck
 
-		transientHandle = ekHandle.Handle()
-		name = ekHandle.Name()
+		transientHandle = ekHandle
 	} else {
 		// Use the provided transient key
-		transientHandle = cfg.TransientKey.Handle()
-		name = cfg.TransientKey.Name()
+		transientHandle = cfg.TransientKey
 	}
 
-	_, err = tpm2.EvictControl{
-		Auth: ToAuthHandle(NewHandle(tpm2.TPMRHOwner), NoAuth),
-		ObjectHandle: &tpm2.NamedHandle{
-			Handle: transientHandle,
-			Name:   name,
-		},
-		PersistentHandle: cfg.Handle.Handle(),
-	}.Execute(t)
-	if err != nil {
-		return nil, fmt.Errorf("EvictControl failed: %w", err)
-	}
-
-	// Return the persistent handle
-	persistedHandle := NewHandle(&tpm2.NamedHandle{
-		Handle: cfg.Handle.Handle(),
-		Name:   name,
+	// Persist the transient key
+	persistedHandle, err := Persist(t, PersistConfig{
+		Hierarchy:        tpm2.TPMRHOwner,
+		Auth:             NoAuth,
+		TransientHandle:  transientHandle,
+		PersistentHandle: cfg.Handle,
+		Force:            cfg.Force,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("Persist failed: %w", err)
+	}
 
 	return persistedHandle, nil
 }
