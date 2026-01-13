@@ -38,9 +38,14 @@ const maxBufferSize = tpmkit.MaxBufferSize
 
 // NVRead reads data from a non-volatile storage (NV) index.
 //
-// Example:
+// By default, data is read from a single NV index.
+// When [NVReadConfig.MultiIndex] is true, data is read from successive NV indices
+// starting from the base index. This should be used when reading data that was
+// written with [NVWriteConfig.MultiIndex] enabled.
 //
-//	// Read from NV index 0x01500000
+// Examples:
+//
+//	// Read from a single NV index
 //	data, err := tpmutil.NVRead(tpm, &tpmutil.NVReadConfig{
 //		Index:     0x01500000,
 //		Hierarchy: tpm2.TPMRHOwner,
@@ -50,16 +55,58 @@ const maxBufferSize = tpmkit.MaxBufferSize
 //	}
 //	fmt.Printf("Read %d bytes from NV index\n", len(data))
 //
+//	// Read data that was written across multiple NV indices
+//	// This will read from 0x01500000, 0x01500001, 0x01500002, etc.
+//	// until all data has been retrieved
+//	data, err = tpmutil.NVRead(tpm, &tpmutil.NVReadConfig{
+//		Index:      0x01500000,
+//		Hierarchy:  tpm2.TPMRHOwner,
+//		MultiIndex: true,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
 // Note: If cfg is nil, default configuration is used.
 func NVRead(t transport.TPM, optionalCfg ...NVReadConfig) ([]byte, error) {
 	cfg := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
 	}
-	return nvRead(t, cfg.Hierarchy, cfg.Index, cfg.Auth, cfg.BlockSize)
+	return nvRead(t, cfg.Hierarchy, cfg.Index, cfg.Auth, cfg.BlockSize, cfg.MultiIndex)
 }
 
-func nvRead(t transport.TPM, hierarchy, index tpm2.TPMHandle, auth tpm2.Session, blockSize int) ([]byte, error) {
+func nvRead(t transport.TPM, hierarchy, index tpm2.TPMHandle, auth tpm2.Session, blockSize int, multiIndex bool) ([]byte, error) {
+	if !multiIndex {
+		return nvReadSingleIndex(t, hierarchy, index, auth, blockSize)
+	}
+
+	// Multi-index read: read from successive indices until we encounter a non-existent index
+	var allData []byte
+	chunkIdx := 0
+
+	for {
+		currentIndex := tpm2.TPMHandle(uint32(index) + uint32(chunkIdx))
+
+		// Try to read the current index
+		chunkData, err := nvReadSingleIndex(t, hierarchy, currentIndex, auth, blockSize)
+		if err != nil {
+			// If we get an error on the first index, propagate it
+			if chunkIdx == 0 {
+				return nil, err
+			}
+			// Otherwise, we've reached the end of the multi-index data
+			break
+		}
+
+		allData = append(allData, chunkData...)
+		chunkIdx++
+	}
+
+	return allData, nil
+}
+
+func nvReadSingleIndex(t transport.TPM, hierarchy, index tpm2.TPMHandle, auth tpm2.Session, blockSize int) ([]byte, error) {
 	readPubRsp, err := tpm2.NVReadPublic{
 		NVIndex: index,
 	}.Execute(t)
@@ -101,14 +148,34 @@ func nvRead(t transport.TPM, hierarchy, index tpm2.TPMHandle, auth tpm2.Session,
 
 // NVWrite writes data to a non-volatile storage (NV) index.
 //
-// Example:
+// By default, data is limited to 2048 bytes on a single NV index.
+// When [NVWriteConfig.MultiIndex] is true, larger data is automatically split
+// into 2048-byte chunks and written to successive NV indices.
 //
-//	// Write data to NV index 0x01500000
+// Examples:
+//
+//	// Write data to a single NV index (≤2048 bytes)
 //	data := []byte("secret data")
 //	err := tpmutil.NVWrite(tpm, &tpmutil.NVWriteConfig{
 //		Index:     0x01500000,
 //		Data:      data,
 //		Hierarchy: tpm2.TPMRHOwner,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Write large data across multiple NV indices
+//	// Data of 4196 bytes (2×2048 + 100) will be split into 3 chunks:
+//	// - 2048 bytes at index 0x01500000
+//	// - 2048 bytes at index 0x01500001
+//	// - 100 bytes at index 0x01500002
+//	largeData := make([]byte, 4196)
+//	err = tpmutil.NVWrite(tpm, &tpmutil.NVWriteConfig{
+//		Index:      0x01500000,
+//		Data:       largeData,
+//		Hierarchy:  tpm2.TPMRHOwner,
+//		MultiIndex: true,
 //	})
 //	if err != nil {
 //		log.Fatal(err)
@@ -120,12 +187,14 @@ func NVWrite(t transport.TPM, optionalCfg ...NVWriteConfig) error {
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return err
 	}
-	return nvWrite(t, cfg.Hierarchy, cfg.Index, cfg.Auth, cfg.Data, cfg.Attributes)
+	return nvWrite(t, cfg.Hierarchy, cfg.Index, cfg.Auth, cfg.Data, cfg.Attributes, cfg.MultiIndex)
 }
 
-func nvWrite(t transport.TPM, hierarchy, index tpm2.TPMHandle, auth tpm2.Session, data []byte, attributes tpm2.TPMANV) error {
+func nvWrite(t transport.TPM, hierarchy, index tpm2.TPMHandle, auth tpm2.Session, data []byte, attributes tpm2.TPMANV, multiIndex bool) error {
 	const maxNVSize = 2048
-	if len(data) > maxNVSize {
+
+	// Validate data size based on multiIndex setting
+	if !multiIndex && len(data) > maxNVSize {
 		return ErrDataTooLarge
 	}
 
@@ -133,49 +202,68 @@ func nvWrite(t transport.TPM, hierarchy, index tpm2.TPMHandle, auth tpm2.Session
 		auth = NoAuth
 	}
 
-	defs := tpm2.NVDefineSpace{
-		AuthHandle: ToAuthHandle(NewHandle(hierarchy), auth),
-		PublicInfo: tpm2.New2B(
-			tpm2.TPMSNVPublic{
-				NVIndex:    index,
-				NameAlg:    tpm2.TPMAlgSHA256,
-				Attributes: attributes,
-				DataSize:   uint16(len(data)),
-			}),
-	}
-	if _, err := defs.Execute(t); err != nil {
-		return err
-	}
-
-	pub, err := defs.PublicInfo.Contents()
-	if err != nil {
-		return err
+	// Calculate chunks for multi-index write
+	var chunks [][]byte
+	if multiIndex && len(data) > maxNVSize {
+		// Split data into chunks of maxNVSize
+		for i := 0; i < len(data); i += maxNVSize {
+			end := min(i+maxNVSize, len(data))
+			chunks = append(chunks, data[i:end])
+		}
+	} else {
+		// Single index write
+		chunks = [][]byte{data}
 	}
 
-	nvName, err := tpm2.NVName(pub)
-	if err != nil {
-		return err
-	}
+	// Write each chunk to successive NV indices
+	for chunkIdx, chunk := range chunks {
+		currentIndex := tpm2.TPMHandle(uint32(index) + uint32(chunkIdx))
 
-	var offset uint16
-	for offset < uint16(len(data)) {
-		end := min(int(offset+maxBufferSize), len(data))
-
-		write := tpm2.NVWrite{
+		defs := tpm2.NVDefineSpace{
 			AuthHandle: ToAuthHandle(NewHandle(hierarchy), auth),
-			NVIndex: tpm2.NamedHandle{
-				Handle: pub.NVIndex,
-				Name:   *nvName,
-			},
-			Data: tpm2.TPM2BMaxNVBuffer{
-				Buffer: data[int(offset):end],
-			},
-			Offset: offset,
+			PublicInfo: tpm2.New2B(
+				tpm2.TPMSNVPublic{
+					NVIndex:    currentIndex,
+					NameAlg:    tpm2.TPMAlgSHA256,
+					Attributes: attributes,
+					DataSize:   uint16(len(chunk)),
+				}),
 		}
-		if _, err := write.Execute(t); err != nil {
-			return fmt.Errorf("running NV_Write command (offset=%d,size=%d): %w", offset, len(data), err)
+		if _, err := defs.Execute(t); err != nil {
+			return fmt.Errorf("defining NV space at index 0x%x (chunk %d/%d): %w", currentIndex, chunkIdx+1, len(chunks), err)
 		}
-		offset += maxBufferSize
+
+		pub, err := defs.PublicInfo.Contents()
+		if err != nil {
+			return err
+		}
+
+		nvName, err := tpm2.NVName(pub)
+		if err != nil {
+			return err
+		}
+
+		// Write chunk data with pagination
+		var offset uint16
+		for offset < uint16(len(chunk)) {
+			end := min(int(offset+maxBufferSize), len(chunk))
+
+			write := tpm2.NVWrite{
+				AuthHandle: ToAuthHandle(NewHandle(hierarchy), auth),
+				NVIndex: tpm2.NamedHandle{
+					Handle: pub.NVIndex,
+					Name:   *nvName,
+				},
+				Data: tpm2.TPM2BMaxNVBuffer{
+					Buffer: chunk[int(offset):end],
+				},
+				Offset: offset,
+			}
+			if _, err := write.Execute(t); err != nil {
+				return fmt.Errorf("running NV_Write command at index 0x%x (chunk %d/%d, offset=%d): %w", currentIndex, chunkIdx+1, len(chunks), offset, err)
+			}
+			offset += maxBufferSize
+		}
 	}
 
 	return nil

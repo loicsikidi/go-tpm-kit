@@ -97,6 +97,15 @@ type NVReadConfig struct {
 	//
 	// Default: maxBufferSize (1024 bytes).
 	BlockSize int
+	// MultiIndex enables reading data from multiple successive NV indices.
+	//
+	// When false (default), data is read from a single NV index.
+	// When true, data is read from successive indices starting from Index
+	// until all data has been retrieved. This should be used when reading
+	// data that was written with [NVWriteConfig.MultiIndex] enabled.
+	//
+	// Default: false.
+	MultiIndex bool
 }
 
 // CheckAndSetDefault validates and sets default values for NVReadConfig.
@@ -137,6 +146,14 @@ type NVWriteConfig struct {
 	//
 	// Default: defaultNVAttributes.
 	Attributes tpm2.TPMANV
+	// MultiIndex enables writing data across multiple successive NV indices.
+	//
+	// When false (default), data size is limited to 2048 bytes on a single index.
+	// When true, data larger than 2048 bytes is split into chunks of 2048 bytes
+	// and written to successive indices starting from Index.
+	//
+	// Default: false.
+	MultiIndex bool
 }
 
 // CheckAndSetDefault validates and sets default values for NVWriteConfig.
