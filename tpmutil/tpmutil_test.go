@@ -111,6 +111,91 @@ func TestNVWrite(t *testing.T) {
 	}
 }
 
+func TestNVWriteMultiIndex(t *testing.T) {
+	thetpm := testutil.OpenSimulator(t)
+
+	baseIndex := tpm2.TPMHandle(0x01800002)
+
+	tests := []struct {
+		name         string
+		payloadSize  int
+		multiIndex   bool
+		wantErr      bool
+		expectedIdxs int // number of expected indices
+	}{
+		{"single index - exactly 2048 bytes", 2048, false, false, 1},
+		{"single index - less than 2048 bytes", 1000, false, false, 1},
+		{"error - exceeds 2048 without multiIndex", 2049, false, true, 0},
+		{"multi-index - exactly 2048 bytes", 2048, true, false, 1},
+		{"multi-index - 2049 bytes (2 chunks)", 2049, true, false, 2},
+		{"multi-index - 4096 bytes (2 chunks)", 4096, true, false, 2},
+		{"multi-index - 4196 bytes (3 chunks: 2048+2048+100)", 4196, true, false, 3},
+		{"multi-index - 6144 bytes (3 chunks)", 6144, true, false, 3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := tpmutil.MustGenerateRnd(tt.payloadSize)
+
+			cfg := tpmutil.NVWriteConfig{
+				Index:      baseIndex,
+				Data:       data,
+				MultiIndex: tt.multiIndex,
+			}
+
+			err := tpmutil.NVWrite(thetpm, cfg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NVWrite() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if err == nil {
+				// Verify data by reading back from all expected indices
+				var readData []byte
+				for i := 0; i < tt.expectedIdxs; i++ {
+					currentIndex := tpm2.TPMHandle(uint32(baseIndex) + uint32(i))
+
+					readCfg := tpmutil.NVReadConfig{
+						Index: currentIndex,
+					}
+					chunkData, err := tpmutil.NVRead(thetpm, readCfg)
+					if err != nil {
+						t.Fatalf("NVRead() failed for index 0x%x (chunk %d): %v", currentIndex, i, err)
+					}
+
+					readData = append(readData, chunkData...)
+
+					// Cleanup: remove the NV index after the test
+					t.Cleanup(func() {
+						readPub := tpm2.NVReadPublic{
+							NVIndex: currentIndex,
+						}
+						readRsp, err := readPub.Execute(thetpm)
+						if err != nil {
+							t.Logf("could not read NV index 0x%x public info: %v", currentIndex, err)
+							return
+						}
+						undefine := tpm2.NVUndefineSpace{
+							AuthHandle: tpm2.TPMRHOwner,
+							NVIndex: tpm2.NamedHandle{
+								Handle: currentIndex,
+								Name:   readRsp.NVName,
+							},
+						}
+						if _, err := undefine.Execute(thetpm); err != nil {
+							t.Logf("could not undefine NV index 0x%x: %v", currentIndex, err)
+						}
+					})
+				}
+
+				// Verify that the data read matches the original data
+				if !bytes.Equal(data, readData) {
+					t.Errorf("data read from NV indices should match data written: expected %d bytes, got %d bytes", len(data), len(readData))
+				}
+			}
+		})
+	}
+}
+
 func TestHashDefault(t *testing.T) {
 	thetpm := testutil.OpenSimulator(t)
 
@@ -398,6 +483,82 @@ func TestNVRead(t *testing.T) {
 
 	if len(readData) != 9 {
 		t.Errorf("Expected to read 9 bytes, got %d", len(readData))
+	}
+}
+
+func TestNVReadMultiIndex(t *testing.T) {
+	thetpm := testutil.OpenSimulator(t)
+
+	baseIndex := tpm2.TPMHandle(0x01800003)
+
+	tests := []struct {
+		name         string
+		payloadSize  int
+		expectedIdxs int // number of expected indices
+	}{
+		{"single index - exactly 2048 bytes", 2048, 1},
+		{"single index - less than 2048 bytes", 1000, 1},
+		{"multi-index - 2049 bytes (2 chunks)", 2049, 2},
+		{"multi-index - 4096 bytes (2 chunks)", 4096, 2},
+		{"multi-index - 4196 bytes (3 chunks: 2048+2048+100)", 4196, 3},
+		{"multi-index - 6144 bytes (3 chunks)", 6144, 3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := tpmutil.MustGenerateRnd(tt.payloadSize)
+
+			// Write data with MultiIndex enabled
+			writeCfg := tpmutil.NVWriteConfig{
+				Index:      baseIndex,
+				Data:       data,
+				MultiIndex: true,
+			}
+
+			err := tpmutil.NVWrite(thetpm, writeCfg)
+			if err != nil {
+				t.Fatalf("NVWrite() failed: %v", err)
+			}
+
+			// Read back data with MultiIndex enabled
+			readCfg := tpmutil.NVReadConfig{
+				Index:      baseIndex,
+				MultiIndex: true,
+			}
+			readData, err := tpmutil.NVRead(thetpm, readCfg)
+			if err != nil {
+				t.Fatalf("NVRead() with MultiIndex failed: %v", err)
+			}
+
+			// Verify that the data read matches the original data
+			if !bytes.Equal(data, readData) {
+				t.Errorf("data read from NV indices should match data written: expected %d bytes, got %d bytes", len(data), len(readData))
+			}
+
+			// Cleanup: remove all NV indices
+			for i := 0; i < tt.expectedIdxs; i++ {
+				currentIndex := tpm2.TPMHandle(uint32(baseIndex) + uint32(i))
+
+				readPub := tpm2.NVReadPublic{
+					NVIndex: currentIndex,
+				}
+				readRsp, err := readPub.Execute(thetpm)
+				if err != nil {
+					t.Logf("could not read NV index 0x%x public info: %v", currentIndex, err)
+					continue
+				}
+				undefine := tpm2.NVUndefineSpace{
+					AuthHandle: tpm2.TPMRHOwner,
+					NVIndex: tpm2.NamedHandle{
+						Handle: currentIndex,
+						Name:   readRsp.NVName,
+					},
+				}
+				if _, err := undefine.Execute(thetpm); err != nil {
+					t.Logf("could not undefine NV index 0x%x: %v", currentIndex, err)
+				}
+			}
+		})
 	}
 }
 
