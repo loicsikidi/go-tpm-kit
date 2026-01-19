@@ -16,6 +16,7 @@ var (
 	ErrMissingData      = errors.New("data is required")
 	ErrMissingPublicKey = errors.New("publicKey is required")
 	ErrMissingIndex     = errors.New("index is required")
+	ErrTooManyIndices   = errors.New("data size exceeds maximum number of NV indices (256)")
 )
 
 // ErrHandleNotFound indicates that a handle was not found at the specified address.

@@ -174,6 +174,17 @@ func (c *NVWriteConfig) CheckAndSetDefault() error {
 	if c.Attributes == (tpm2.TPMANV{}) {
 		c.Attributes = defaultNVAttributes
 	}
+
+	// Validate data size constraints
+	if c.MultiIndex {
+		requiredIndices := (len(c.Data) + maxNVSize - 1) / maxNVSize
+		if requiredIndices > maxIndexCount {
+			return ErrDataTooLarge
+		}
+	} else if len(c.Data) > maxNVSize {
+		return ErrDataTooLarge
+	}
+
 	return nil
 }
 
