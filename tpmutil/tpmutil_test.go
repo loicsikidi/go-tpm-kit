@@ -131,6 +131,7 @@ func TestNVWriteMultiIndex(t *testing.T) {
 		{"multi-index - 4096 bytes (2 chunks)", 4096, true, false, 2},
 		{"multi-index - 4196 bytes (3 chunks: 2048+2048+100)", 4196, true, false, 3},
 		{"multi-index - 6144 bytes (3 chunks)", 6144, true, false, 3},
+		{"error - exceeds max indices (524 289 bytes)", 256*2048 + 1, true, true, 0},
 	}
 
 	for _, tt := range tests {
@@ -191,6 +192,58 @@ func TestNVWriteMultiIndex(t *testing.T) {
 				if !bytes.Equal(data, readData) {
 					t.Errorf("data read from NV indices should match data written: expected %d bytes, got %d bytes", len(data), len(readData))
 				}
+			}
+		})
+	}
+}
+
+func TestNVWriteMaxIndicesValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		payloadSize int
+		multiIndex  bool
+		wantErr     error
+	}{
+		{
+			name:        "at limit - 256 indices",
+			payloadSize: 256 * 2048,
+			multiIndex:  true,
+			wantErr:     nil,
+		},
+		{
+			name:        "exceeds limit - 257 indices",
+			payloadSize: 257 * 2048,
+			multiIndex:  true,
+			wantErr:     tpmutil.ErrDataTooLarge,
+		},
+		{
+			name:        "single index - exceeds size",
+			payloadSize: 2049,
+			multiIndex:  false,
+			wantErr:     tpmutil.ErrDataTooLarge,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := tpmutil.MustGenerateRnd(tt.payloadSize)
+
+			cfg := tpmutil.NVWriteConfig{
+				Index:      tpm2.TPMHandle(0x01800010),
+				Data:       data,
+				MultiIndex: tt.multiIndex,
+			}
+
+			// Test validation in CheckAndSetDefault
+			err := cfg.CheckAndSetDefault()
+			if tt.wantErr != nil {
+				if err == nil {
+					t.Errorf("CheckAndSetDefault: expected error %v, got nil", tt.wantErr)
+				} else if err != tt.wantErr {
+					t.Errorf("CheckAndSetDefault: expected error %v, got %v", tt.wantErr, err)
+				}
+			} else if err != nil {
+				t.Errorf("CheckAndSetDefault: unexpected error: %v", err)
 			}
 		})
 	}

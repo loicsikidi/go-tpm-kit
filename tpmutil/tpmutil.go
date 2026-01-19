@@ -34,7 +34,11 @@ var (
 	}
 )
 
-const maxBufferSize = tpmkit.MaxBufferSize
+const (
+	maxBufferSize = tpmkit.MaxBufferSize
+	maxNVSize     = 2048
+	maxIndexCount = 256
+)
 
 // NVRead reads data from a non-volatile storage (NV) index.
 //
@@ -86,6 +90,11 @@ func nvRead(t transport.TPM, hierarchy, index tpm2.TPMHandle, auth tpm2.Session,
 	chunkIdx := 0
 
 	for {
+		// defensive approach to avoid infinite loop or excessive indices
+		if chunkIdx >= maxIndexCount {
+			return nil, ErrDataTooLarge
+		}
+
 		currentIndex := tpm2.TPMHandle(uint32(index) + uint32(chunkIdx))
 
 		// Try to read the current index
@@ -152,6 +161,10 @@ func nvReadSingleIndex(t transport.TPM, hierarchy, index tpm2.TPMHandle, auth tp
 // When [NVWriteConfig.MultiIndex] is true, larger data is automatically split
 // into 2048-byte chunks and written to successive NV indices.
 //
+// The maximum number of indices that can be used is 256, which limits the total
+// data size to 524,288 bytes (512 KB) when using multi-index mode. If the data
+// size exceeds this limit, [ErrDataTooLarge] is returned.
+//
 // Examples:
 //
 //	// Write data to a single NV index (≤2048 bytes)
@@ -191,8 +204,6 @@ func NVWrite(t transport.TPM, optionalCfg ...NVWriteConfig) error {
 }
 
 func nvWrite(t transport.TPM, hierarchy, index tpm2.TPMHandle, auth tpm2.Session, data []byte, attributes tpm2.TPMANV, multiIndex bool) error {
-	const maxNVSize = 2048
-
 	// Validate data size based on multiIndex setting
 	if !multiIndex && len(data) > maxNVSize {
 		return ErrDataTooLarge
