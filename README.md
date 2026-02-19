@@ -27,6 +27,7 @@ I've seen myself re-implementing similar functionalities across different projec
 | [`tpmutil`](./tpmutil/) | Provides utility functions to interact with TPMs (e.g., reading/writing NV indices, managing sessions, etc.) | ✅ |
 | [`tpmcrypto`](./tpmcrypto/) | Provides cryptographic utilities and abstractions for working with TPM keys and signatures | ❌ |
 | [`tpmsession`](./tpmsession/) | Provides utilities for creating and managing encrypted TPM sessions (ie. parameter encryption, HMAC protection and Audit)  | ✅ |
+| [`tpmtest`](./tpmtest/) | Provides test helpers for working with the TPM simulator (e.g., opening a simulator connection with automatic cleanup) | ❌ |
 
 ## Dependencies
 
