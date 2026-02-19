@@ -73,28 +73,38 @@ type Handle interface {
 	IsAuth() bool
 	// Type returns the type of the handle.
 	Type() HandleType
-	// Public returns the public area associated with the handle.
-	// Returns nil if no public area is available.
-	Public() *tpm2.TPMTPublic
-	// HasPublic indicates if the handle has an associated public area.
-	HasPublic() bool
 }
 
 // HandleCloser extends Handle with the ability to release resources.
 // When a HandleCloser is no longer needed, calling Close() will flush the handle
 //
+// For convenience, a HandleCloser may provide a Public() method in order to
+// access the public area of the associated key. Implementations should ensure
+// that the public area is properly populated.
+//
 // Note: struct implementing this interface must have access to a TPM transport.
 type HandleCloser interface {
 	Handle
 	io.Closer
+	// Public returns the public area associated with the handle.
+	// Returns nil if no public area is available.
+	Public() *tpm2.TPMTPublic
+	// HasPublic indicates if the handle has an associated public area.
+	//
+	// EXPERIMENTAL: This method is experimental and may be removed in future releases.
+	HasPublic() bool
 }
 
+// tpmHandle is an implementation of the HandleCloser interface.
+// It wraps a TPM handle and provides methods to interact with it.
 type tpmHandle struct {
 	handle
 	tpm    transport.TPM
 	isAuth bool
 	public *tpm2.TPMTPublic
 }
+
+var _ HandleCloser = (*tpmHandle)(nil)
 
 // NewHandle creates a new Handle from the given TPM handle.
 //
@@ -199,7 +209,7 @@ func IsHandleOfType(h Handle, ht HandleType) bool {
 	return identifyHandleType(h) == ht
 }
 
-// ToHandle converts an input a [tpm2.TPMHandle].
+// ToHandle converts an input to a [Handle].
 //
 // Example:
 //
@@ -215,25 +225,77 @@ func IsHandleOfType(h Handle, ht HandleType) bool {
 func ToHandle(t transport.TPM, handle any) (Handle, error) {
 	switch h := handle.(type) {
 	case tpm2.TPMHandle:
-		rsp, err := tpm2.ReadPublic{
-			ObjectHandle: h,
-		}.Execute(t)
+		pa, err := getPublicArea(t, h)
 		if err != nil {
-			return nil, fmt.Errorf("tpm2.ReadPublic() failed: %w", err)
-		}
-		pub, err := rsp.OutPublic.Contents()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get public contents: %w", err)
+			return nil, err
 		}
 		return &tpmHandle{
-			handle: &tpm2.NamedHandle{Handle: h, Name: rsp.Name},
+			handle: &tpm2.NamedHandle{Handle: h, Name: pa.Name},
 			tpm:    t,
-			public: pub,
+			public: pa.public,
 		}, nil
 	case Handle:
 		return h, nil
 	default:
 		return nil, fmt.Errorf("expected tpm2.TPMHandle or a struct implementing tpmutil.Handle, got %T", h)
+	}
+}
+
+// ToHandleCloser converts an input to a [HandleCloser].
+//
+// The handle argument accepts the following types:
+//   - [tpm2.TPMHandle]: a TPM2_ReadPublic command is issued to retrieve the
+//     associated Name and public area.
+//   - [HandleCloser]: returned as-is. If the underlying [*tpmHandle] is missing
+//     its public area, a TPM2_ReadPublic is issued to populate it.
+//   - [Handle]: a TPM2_ReadPublic command is issued to build a full [HandleCloser]
+//     with the associated Name and public area.
+//
+// The returned [HandleCloser] is guaranteed to have a public area available
+// via [HandleCloser.Public].
+//
+// Example:
+//
+//	// Convert a raw TPM handle to a HandleCloser
+//	hc, err := tpmutil.ToHandleCloser(tpm, tpm2.TPMHandle(0x81000001))
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer hc.Close()
+//	fmt.Printf("Handle: 0x%x, Type: %s\n", hc.Handle(), hc.Type())
+func ToHandleCloser(t transport.TPM, handle any) (HandleCloser, error) {
+	switch h := handle.(type) {
+	case tpm2.TPMHandle:
+		hh, err := ToHandle(t, h)
+		if err != nil {
+			return nil, err
+		}
+		return ToHandleCloser(t, hh)
+	case HandleCloser:
+		tpmh, ok := h.(*tpmHandle)
+		if !ok {
+			return h, nil
+		}
+		if !tpmh.HasPublic() {
+			pa, err := getPublicArea(t, tpmh)
+			if err != nil {
+				return nil, err
+			}
+			tpmh.public = pa.public
+		}
+		return h, nil
+	case Handle:
+		pa, err := getPublicArea(t, h)
+		if err != nil {
+			return nil, err
+		}
+		return &tpmHandle{
+			handle: h,
+			tpm:    t,
+			public: pa.public,
+		}, nil
+	default:
+		return nil, fmt.Errorf("expected tpm2.TPMHandle or a struct implementing tpmutil.Handle/tpmutil.HandleCloser, got %T", h)
 	}
 }
 

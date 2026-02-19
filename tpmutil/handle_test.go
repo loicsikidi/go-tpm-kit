@@ -7,6 +7,7 @@ import (
 	"github.com/google/go-tpm/tpm2"
 	tpmkit "github.com/loicsikidi/go-tpm-kit"
 	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
+	"github.com/loicsikidi/go-tpm-kit/tpmtest"
 )
 
 func TestHandleType_String(t *testing.T) {
@@ -331,6 +332,92 @@ func TestAsHandle(t *testing.T) {
 	})
 }
 
+func TestToHandleCloser(t *testing.T) {
+	thetpm := tpmtest.OpenSimulator(t)
+
+	t.Run("from TPMHandle", func(t *testing.T) {
+		createPrimary := tpm2.CreatePrimary{
+			PrimaryHandle: tpm2.TPMRHOwner,
+			InPublic:      tpm2.New2B(tpm2.ECCSRKTemplate),
+		}
+
+		rsp, err := createPrimary.Execute(thetpm)
+		if err != nil {
+			t.Fatalf("CreatePrimary() failed: %v", err)
+		}
+
+		hc, err := ToHandleCloser(thetpm, rsp.ObjectHandle)
+		if err != nil {
+			t.Fatalf("ToHandleCloser() failed: %v", err)
+		}
+		if hc == nil {
+			t.Fatal("ToHandleCloser() returned nil")
+		}
+		if hc.Handle() != rsp.ObjectHandle {
+			t.Errorf("Handle() = %v, want %v", hc.Handle(), rsp.ObjectHandle)
+		}
+		if hc.Type() != TransientHandle {
+			t.Errorf("Type() = %v, want %v", hc.Type(), TransientHandle)
+		}
+		if !hc.HasPublic() {
+			t.Error("HasPublic() = false, want true")
+		}
+		if hc.Public() == nil {
+			t.Error("Public() returned nil, want non-nil")
+		}
+
+		if err := hc.Close(); err != nil {
+			t.Errorf("Close() failed: %v", err)
+		}
+	})
+
+	t.Run("from HandleCloser without public area", func(t *testing.T) {
+		createPrimary := tpm2.CreatePrimary{
+			PrimaryHandle: tpm2.TPMRHOwner,
+			InPublic:      tpm2.New2B(tpm2.ECCSRKTemplate),
+		}
+
+		rsp, err := createPrimary.Execute(thetpm)
+		if err != nil {
+			t.Fatalf("CreatePrimary() failed: %v", err)
+		}
+
+		original := NewHandleCloser(thetpm, &tpm2.NamedHandle{
+			Handle: rsp.ObjectHandle,
+			Name:   rsp.Name,
+		})
+		defer original.Close()
+
+		if original.HasPublic() {
+			t.Errorf("HasPublic() = true, want false")
+		}
+
+		// here ToHandleCloser is expected to populate the public area
+		hc, err := ToHandleCloser(thetpm, original)
+		if err != nil {
+			t.Fatalf("ToHandleCloser() failed: %v", err)
+		}
+
+		if !hc.HasPublic() {
+			t.Errorf("HasPublic() = false, want true")
+		}
+	})
+
+	t.Run("invalid type", func(t *testing.T) {
+		_, err := ToHandleCloser(thetpm, "invalid-type")
+		if err == nil {
+			t.Error("ToHandleCloser() succeeded with invalid type, want error")
+		}
+	})
+
+	t.Run("invalid TPMHandle", func(t *testing.T) {
+		_, err := ToHandleCloser(thetpm, tpm2.TPMHandle(0x80999999))
+		if err == nil {
+			t.Error("ToHandleCloser() succeeded with invalid TPMHandle, want error")
+		}
+	})
+}
+
 func TestTpmHandleMethods(t *testing.T) {
 	t.Run("Handle() method", func(t *testing.T) {
 		namedHandle := tpm2.NamedHandle{
@@ -449,22 +536,6 @@ func TestTpmHandleMethods(t *testing.T) {
 
 		if gotPublic.Type != tpm2.TPMAlgECC {
 			t.Errorf("Public().Type = %v, want %v", gotPublic.Type, tpm2.TPMAlgECC)
-		}
-	})
-
-	t.Run("Public() method - without public", func(t *testing.T) {
-		namedHandle := tpm2.NamedHandle{
-			Handle: tpm2.TPMHandle(0x80000001),
-			Name:   tpm2.TPM2BName{Buffer: []byte("test")},
-		}
-		h := NewHandle(&namedHandle)
-
-		if h.HasPublic() {
-			t.Error("HasPublic() = true, want false")
-		}
-
-		if h.Public() != nil {
-			t.Error("Public() returned non-nil, want nil")
 		}
 	})
 }
