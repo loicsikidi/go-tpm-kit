@@ -83,14 +83,20 @@ type Handle interface {
 // HandleCloser extends Handle with the ability to release resources.
 // When a HandleCloser is no longer needed, calling Close() will flush the handle
 //
-// For convenience, a HandleCloser may provide a Public() method in order to
-// access the public area of the associated key. Implementations should ensure
-// that the public area is properly populated.
-//
-// Note: struct implementing this interface must have access to a TPM transport.
+// For convenience, [HandleCloser] includes the [PublicGetter] interface in order to
+// access the public area of the associated key. Implementations should have no
+// difficulty to implement this interface, because [HandleCloser] ensures to
+// have access to a TPM transport.
 type HandleCloser interface {
 	Handle
+	PublicGetter
 	io.Closer
+}
+
+// PublicGetter provides access to the public area of a key handle.
+//
+// Note: APIs which accept [Handle], may try to do an interface upgrade with [PublicGetter] to access the public area.
+type PublicGetter interface {
 	// Public returns the public area associated with the handle.
 	// Returns nil if no public area is available.
 	Public() *tpm2.TPMTPublic
@@ -110,6 +116,7 @@ type tpmHandle struct {
 }
 
 var _ HandleCloser = (*tpmHandle)(nil)
+var _ PublicGetter = (*tpmHandle)(nil)
 
 // NewHandle creates a new Handle from the given TPM handle.
 //
