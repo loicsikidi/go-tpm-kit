@@ -274,6 +274,63 @@ func TestHashConfigValidation(t *testing.T) {
 	}
 }
 
+func TestGetKeyHandleConfigValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     tpmutil.GetPersistedKeyHandleConfig
+		wantErr bool
+	}{
+		{
+			name:    "missing Handle",
+			cfg:     tpmutil.GetPersistedKeyHandleConfig{},
+			wantErr: true,
+		},
+		{
+			name: "non-persistent Handle (transient)",
+			cfg: tpmutil.GetPersistedKeyHandleConfig{
+				Handle: tpmutil.NewHandle(tpm2.TPMHandle(0x80000001)),
+			},
+			wantErr: true,
+		},
+		{
+			name: "non-persistent Handle (NV index)",
+			cfg: tpmutil.GetPersistedKeyHandleConfig{
+				Handle: tpmutil.NewHandle(tpm2.TPMHandle(0x01800001)),
+			},
+			wantErr: true,
+		},
+		{
+			name: "non-persistent Handle (permanent)",
+			cfg: tpmutil.GetPersistedKeyHandleConfig{
+				Handle: tpmutil.NewHandle(tpm2.TPMRHOwner),
+			},
+			wantErr: true,
+		},
+		{
+			name: "valid persistent Handle",
+			cfg: tpmutil.GetPersistedKeyHandleConfig{
+				Handle: tpmutil.NewHandle(tpm2.TPMHandle(0x81000001)),
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.cfg.CheckAndSetDefault()
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("expected no error, got %v", err)
+				}
+			}
+		})
+	}
+}
+
 func TestHmacConfigValidation(t *testing.T) {
 	tests := []struct {
 		name    string

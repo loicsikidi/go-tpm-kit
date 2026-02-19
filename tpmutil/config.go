@@ -561,6 +561,25 @@ func (c *KeyConfig) CheckAndSetDefault() error {
 	return nil
 }
 
+// GetPersistedKeyHandleConfig holds configuration for reading a key from persistent TPM storage.
+type GetPersistedKeyHandleConfig struct {
+	// Handle is the persistent handle to read from.
+	//
+	// Required.
+	Handle Handle
+}
+
+// CheckAndSetDefault validates [GetPersistedKeyHandleConfig] fields.
+func (c *GetPersistedKeyHandleConfig) CheckAndSetDefault() error {
+	if c.Handle == nil {
+		return ErrMissingHandle
+	}
+	if c.Handle.Type() != PersistentHandle {
+		return fmt.Errorf("invalid value: 'Handle' must be a persistent TPM handle (got %v)", c.Handle.Type())
+	}
+	return nil
+}
+
 // PersistConfig holds configuration for persisting a transient object to a persistent handle.
 type PersistConfig struct {
 	// TransientHandle is the handle of the transient object to persist.

@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/asn1"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -552,6 +553,53 @@ func formatRSASignature(sig tpm2.TPMTSignature, alg tpm2.TPMAlgID) ([]byte, erro
 	}
 }
 
+// GetPersistedKeyHandle reads a key from persistent TPM storage at the handle specified
+// in [GetPersistedKeyHandleConfig].
+//
+// The handle must reference a persistent TPM object (handle range 0x81000000-0x81FFFFFF).
+// If the handle does not exist, an [ErrHandleNotFound] error is returned.
+//
+// Example:
+//
+//	handle, err := tpmutil.GetPersistedKeyHandle(tpm, tpmutil.GetKeyHandleConfig{
+//		Handle: tpmutil.NewHandle(tpm2.TPMHandle(0x81000001)),
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Printf("Key handle: 0x%x\n", handle.Handle())
+func GetPersistedKeyHandle(t transport.TPM, optionalCfg ...GetPersistedKeyHandleConfig) (HandleCloser, error) {
+	cfg := utils.OptionalArg(optionalCfg)
+	if err := cfg.CheckAndSetDefault(); err != nil {
+		return nil, err
+	}
+
+	pa, err := getPublicArea(t, cfg.Handle.Handle())
+	if err != nil {
+		// Close the handle before returning the error
+		closer := createCloser(t, cfg.Handle.Handle())
+		_ = closer()
+
+		if errors.Is(err, tpm2.TPMRCHandle) {
+			return nil, &ErrHandleNotFound{
+				Handle: cfg.Handle.Handle(),
+				Err:    err,
+			}
+		}
+		return nil, err
+	}
+
+	hc := &tpmHandle{
+		handle: &tpm2.NamedHandle{
+			Name:   pa.Name,
+			Handle: cfg.Handle.Handle(),
+		},
+		tpm:    t,
+		public: pa.public,
+	}
+	return hc, nil
+}
+
 // GetSKRHandle retrieves or creates the Storage Root Key (SRK) handle based on the provided configuration.
 //
 // Example:
@@ -573,13 +621,11 @@ func GetSKRHandle(t transport.TPM, optionalCfg ...ParentConfig) (Handle, error) 
 		return nil, err
 	}
 
-	readPublicRsp, err := tpm2.ReadPublic{
-		ObjectHandle: cfg.Handle.Handle(),
-	}.Execute(t)
+	handle, err := GetPersistedKeyHandle(t, GetPersistedKeyHandleConfig{
+		Handle: cfg.Handle,
+	})
 	if err == nil {
-		// Found the persistent handle, assume it's the key we want.
-		h := &tpm2.NamedHandle{Name: readPublicRsp.Name, Handle: cfg.Handle.Handle()}
-		return NewHandle(h), nil
+		return handle, nil
 	}
 
 	rerr := err // Preserve this failure for later logging, if needed
@@ -639,18 +685,9 @@ func GetEKHandle(t transport.TPM, optionalCfg ...EKParentConfig) (Handle, error)
 		return nil, err
 	}
 
-	readPublicRsp, err := tpm2.ReadPublic{
-		ObjectHandle: cfg.Handle.Handle(),
-	}.Execute(t)
-	if err != nil {
-		return nil, &ErrHandleNotFound{
-			Handle: cfg.Handle.Handle(),
-			Err:    err,
-		}
-	}
-
-	h := &tpm2.NamedHandle{Name: readPublicRsp.Name, Handle: cfg.Handle.Handle()}
-	return NewHandle(h), nil
+	return GetPersistedKeyHandle(t, GetPersistedKeyHandleConfig{
+		Handle: cfg.Handle,
+	})
 }
 
 // getEKTemplate returns the appropriate EK template based on KeyType and IsLowRange.
@@ -783,9 +820,7 @@ func Persist(t transport.TPM, optionalCfg ...PersistConfig) (Handle, error) {
 	}
 
 	// Check if a key already exists at the target handle
-	readPublicRsp, err := tpm2.ReadPublic{
-		ObjectHandle: cfg.PersistentHandle.Handle(),
-	}.Execute(t)
+	pa, err := getPublicArea(t, cfg.PersistentHandle.Handle())
 	if err == nil {
 		// Key exists at the target handle
 		if !cfg.Force {
@@ -795,7 +830,7 @@ func Persist(t transport.TPM, optionalCfg ...PersistConfig) (Handle, error) {
 		// Remove the existing key
 		existingHandle := NewHandle(&tpm2.NamedHandle{
 			Handle: cfg.PersistentHandle.Handle(),
-			Name:   readPublicRsp.Name,
+			Name:   pa.Name,
 		})
 		_, evictErr := tpm2.EvictControl{
 			Auth:             ToAuthHandle(NewHandle(cfg.Hierarchy), cfg.Auth),
@@ -905,11 +940,7 @@ func CreatePrimaryWithResult(t transport.TPM, optionalCfg ...CreatePrimaryConfig
 		Name:           rsp.Name,
 	}
 
-	closer := func() error {
-		_, err := (&tpm2.FlushContext{FlushHandle: rsp.ObjectHandle}).Execute(t)
-		return err
-	}
-	return result, closer, nil
+	return result, createCloser(t, rsp.ObjectHandle), nil
 }
 
 // Load loads a key into the TPM and returns a [HandleCloser].
@@ -1198,4 +1229,37 @@ func toTPM2BSensitiveCreate(userAuth, data []byte) tpm2.TPM2BSensitiveCreate {
 		})
 	}
 	return sensitive
+}
+
+// createCloser returns a function that flushes the given TPM handle when called.
+func createCloser(t transport.TPM, handle tpm2.TPMHandle) func() error {
+	return func() error {
+		_, err := (&tpm2.FlushContext{FlushHandle: handle}).Execute(t)
+		return err
+	}
+}
+
+type publicArea struct {
+	public        *tpm2.TPMTPublic
+	Name          tpm2.TPM2BName
+	QualifiedName tpm2.TPM2BName
+}
+
+// getPublicArea retrieves the public area of a TPM object.
+func getPublicArea(t transport.TPM, handle handle) (*publicArea, error) {
+	rsp, err := tpm2.ReadPublic{
+		ObjectHandle: handle,
+	}.Execute(t)
+	if err != nil {
+		return nil, err
+	}
+	pub, err := rsp.OutPublic.Contents()
+	if err != nil {
+		return nil, err
+	}
+	return &publicArea{
+		public:        pub,
+		Name:          rsp.Name,
+		QualifiedName: rsp.QualifiedName,
+	}, nil
 }
