@@ -1,3 +1,8 @@
+// Copyright (c) 2025, Loïc Sikidi
+// All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package tpmutil_test
 
 import (
@@ -12,8 +17,8 @@ import (
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 	tpmkit "github.com/loicsikidi/go-tpm-kit"
-	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 	"github.com/loicsikidi/go-tpm-kit/tpmcrypto"
+	"github.com/loicsikidi/go-tpm-kit/tpmtest"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
@@ -44,7 +49,7 @@ var hmacKeyTemplate = tpm2.TPMTPublic{
 }
 
 func TestNVWrite(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	index := tpm2.TPMHandle(0x01800001)
 	maxBufferSize := 1024
@@ -112,7 +117,7 @@ func TestNVWrite(t *testing.T) {
 }
 
 func TestNVWriteMultiIndex(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	baseIndex := tpm2.TPMHandle(0x01800002)
 
@@ -250,7 +255,7 @@ func TestNVWriteMaxIndicesValidation(t *testing.T) {
 }
 
 func TestHashDefault(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	run := func(t *testing.T, bufferSize int, hierarchy tpm2.TPMHandle, transport transport.TPM) {
 		data := make([]byte, bufferSize)
@@ -293,7 +298,7 @@ func TestHashDefault(t *testing.T) {
 }
 
 func TestTPMHashMsgTooShort(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	// TPM will refuse to hash a message that is too short.
 	sizes := []int{0, 1, 2}
@@ -314,7 +319,7 @@ func TestTPMHashMsgTooShort(t *testing.T) {
 }
 
 func TestTPMHash(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	sizes := []int{
 		tpmkit.MaxBufferSize / 2,
@@ -354,7 +359,7 @@ func TestTPMHash(t *testing.T) {
 }
 
 func TestHash(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	data := []byte("hello world")
 	cfg := tpmutil.HashConfig{
@@ -380,7 +385,7 @@ func TestHash(t *testing.T) {
 }
 
 func TestHashWithCustomConfig(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	cfg := tpmutil.HashConfig{
 		Hierarchy: tpm2.TPMRHOwner,
@@ -403,7 +408,7 @@ func TestHashWithCustomConfig(t *testing.T) {
 }
 
 func TestSign(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	// Create a primary signing key
 	signingTemplate := tpm2.TPMTPublic{
@@ -495,7 +500,7 @@ func TestSign(t *testing.T) {
 }
 
 func TestNVRead(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	index := tpm2.TPMHandle(0x01800001)
 	data := []byte("test data")
@@ -540,7 +545,7 @@ func TestNVRead(t *testing.T) {
 }
 
 func TestNVReadMultiIndex(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	baseIndex := tpm2.TPMHandle(0x01800003)
 
@@ -705,7 +710,7 @@ func TestMustGenerateIV(t *testing.T) {
 }
 
 func TestSymEncryptDecrypt(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	primary, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHOwner,
@@ -833,7 +838,7 @@ func TestSymEncryptDecrypt(t *testing.T) {
 }
 
 func TestSymEncryptDecryptValidation(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	primary, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHOwner,
@@ -920,7 +925,7 @@ func TestSymEncryptDecryptValidation(t *testing.T) {
 }
 
 func TestHmac(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	hmacKey, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHOwner,
@@ -952,7 +957,7 @@ func TestHmac(t *testing.T) {
 }
 
 func TestHmacWithCustomConfig(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	hmacKey, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHOwner,
@@ -985,7 +990,7 @@ func TestHmacWithCustomConfig(t *testing.T) {
 }
 
 func TestHmacWithVariousDataSizes(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	hmacKey, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHOwner,
@@ -1041,7 +1046,7 @@ func TestHmacWithVariousDataSizes(t *testing.T) {
 }
 
 func TestHmacWithDifferentBlockSizes(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	hmacKey, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHOwner,
@@ -1084,7 +1089,7 @@ func TestHmacWithDifferentBlockSizes(t *testing.T) {
 }
 
 func TestHmacValidation(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	hmacKey, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHOwner,

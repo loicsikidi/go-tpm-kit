@@ -1,3 +1,8 @@
+// Copyright (c) 2026, Loïc Sikidi
+// All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package tpmutil_test
 
 import (
@@ -5,12 +10,12 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
+	"github.com/loicsikidi/go-tpm-kit/tpmtest"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
 func TestPersist(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 	targetHandle := tpmutil.NewHandle(tpm2.TPMHandle(0x81000100))
 
 	// Create a transient primary key
@@ -48,7 +53,7 @@ func TestPersist(t *testing.T) {
 }
 
 func TestPersist_DefaultHierarchy(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 	targetHandle := tpmutil.NewHandle(tpm2.TPMHandle(0x81000101))
 
 	// Create a transient primary key
@@ -80,7 +85,7 @@ func TestPersist_DefaultHierarchy(t *testing.T) {
 }
 
 func TestPersist_InvalidTransientHandle(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	// Try to persist with a persistent handle (should fail)
 	_, err := tpmutil.Persist(thetpm, tpmutil.PersistConfig{
@@ -93,7 +98,7 @@ func TestPersist_InvalidTransientHandle(t *testing.T) {
 }
 
 func TestPersist_InvalidPersistentHandle(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	// Create a transient primary key
 	transientHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
@@ -116,7 +121,7 @@ func TestPersist_InvalidPersistentHandle(t *testing.T) {
 }
 
 func TestPersist_MissingTransientHandle(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	_, err := tpmutil.Persist(thetpm, tpmutil.PersistConfig{
 		PersistentHandle: tpmutil.NewHandle(tpm2.TPMHandle(0x81000100)),
@@ -127,7 +132,7 @@ func TestPersist_MissingTransientHandle(t *testing.T) {
 }
 
 func TestPersist_MissingPersistentHandle(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	transientHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
 		PrimaryHandle: tpm2.TPMRHOwner,
@@ -147,7 +152,7 @@ func TestPersist_MissingPersistentHandle(t *testing.T) {
 }
 
 func TestPersist_HandleAlreadyOccupied(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 	targetHandle := tpmutil.NewHandle(tpm2.TPMHandle(0x81000102))
 
 	// Create and persist the first key

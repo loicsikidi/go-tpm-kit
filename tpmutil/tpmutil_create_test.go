@@ -1,15 +1,20 @@
+// Copyright (c) 2026, Loïc Sikidi
+// All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package tpmutil_test
 
 import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
+	"github.com/loicsikidi/go-tpm-kit/tpmtest"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
 func TestCreate(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	t.Run("with ECC template", func(t *testing.T) {
 		eccTemplate := tpmutil.ECCSRKTemplate
@@ -309,7 +314,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestCreateWithResult(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	t.Run("with ECC template", func(t *testing.T) {
 		// First create a primary key to use as parent

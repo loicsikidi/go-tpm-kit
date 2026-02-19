@@ -1,3 +1,8 @@
+// Copyright (c) 2025, Loïc Sikidi
+// All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package tpmutil_test
 
 import (
@@ -5,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
+	"github.com/loicsikidi/go-tpm-kit/tpmtest"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
@@ -29,7 +34,7 @@ func TestGetEKHandle_NotFound(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			thetpm := testutil.OpenSimulator(t)
+			thetpm := tpmtest.OpenSimulator(t)
 
 			cfg := tpmutil.EKParentConfig{
 				KeyFamily: tt.keyFamily,
@@ -77,7 +82,7 @@ func TestGetEKHandle_AlreadyPersisted(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			thetpm := testutil.OpenSimulator(t)
+			thetpm := tpmtest.OpenSimulator(t)
 
 			// Create and persist an EK manually
 			ekHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
@@ -135,7 +140,7 @@ func TestGetEKHandle_AlreadyPersisted(t *testing.T) {
 }
 
 func TestGetEKHandle_CustomHandle(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	// Use a non-standard persistent handle
 	customHandle := tpm2.TPMHandle(0x81010010)
@@ -195,7 +200,7 @@ func TestGetEKHandle_CustomHandle(t *testing.T) {
 }
 
 func TestGetEKHandle_DefaultConfig(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	// Create and persist an ECC EK at default handle
 	ekHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{

@@ -1,3 +1,8 @@
+// Copyright (c) 2025, Loïc Sikidi
+// All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package tpmsession_test
 
 import (
@@ -7,8 +12,8 @@ import (
 
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
-	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 	"github.com/loicsikidi/go-tpm-kit/tpmsession"
+	"github.com/loicsikidi/go-tpm-kit/tpmtest"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
@@ -141,7 +146,7 @@ func createSealedObject(t *testing.T, tpm transport.TPM, handle tpm2.TPMHandle, 
 }
 
 func TestAuthProvider_ErrorHandling(t *testing.T) {
-	tpm := testutil.OpenSimulator(t)
+	tpm := tpmtest.OpenSimulator(t)
 
 	// Create sealed object
 	getSRK(t, tpm, 0x81000001)
@@ -170,7 +175,7 @@ func TestAuthProvider_ErrorHandling(t *testing.T) {
 }
 
 func TestNewSessionManager_HandleValidation(t *testing.T) {
-	tpm := testutil.OpenSimulator(t)
+	tpm := tpmtest.OpenSimulator(t)
 
 	// Create SRK for valid handle tests
 	name, _ := getSRK(t, tpm, 0x81000001)
@@ -268,7 +273,7 @@ func TestNewSessionManager_HandleValidation(t *testing.T) {
 }
 
 func TestSessionManager_IntegrationWithTPMCommands(t *testing.T) {
-	tpm := testutil.OpenSimulator(t)
+	tpm := tpmtest.OpenSimulator(t)
 
 	// Create SRK
 	srkName, srkPublic := getSRK(t, tpm, 0x81000001)
@@ -357,7 +362,7 @@ func TestSessionManager_IntegrationWithTPMCommands(t *testing.T) {
 // sessions that work correctly with TPM commands supporting parameter encryption.
 // This validates that the session encryption/decryption is properly configured.
 func TestSessionManager_EncryptedCommands(t *testing.T) {
-	tpm := testutil.OpenSimulator(t)
+	tpm := tpmtest.OpenSimulator(t)
 
 	// Create SRK for salted session
 	name, public := getSRK(t, tpm, 0x81000001)
@@ -513,7 +518,7 @@ func TestSessionManager_EncryptedCommands(t *testing.T) {
 }
 
 func TestSessionManager_WithHashAlg(t *testing.T) {
-	tpm := testutil.OpenSimulator(t)
+	tpm := tpmtest.OpenSimulator(t)
 
 	// Create SRK
 	name, public := getSRK(t, tpm, 0x81000001)
@@ -637,7 +642,7 @@ func TestSessionManager_WithHashAlg(t *testing.T) {
 }
 
 func TestSessionManager_AuditSession(t *testing.T) {
-	tpm := testutil.OpenSimulator(t)
+	tpm := tpmtest.OpenSimulator(t)
 
 	// Create SRK
 	name, public := getSRK(t, tpm, 0x81000001)

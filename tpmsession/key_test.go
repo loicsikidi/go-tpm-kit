@@ -1,3 +1,8 @@
+// Copyright (c) 2025, Loïc Sikidi
+// All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package tpmsession_test
 
 import (
@@ -7,12 +12,12 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 	"github.com/loicsikidi/go-tpm-kit/tpmsession"
+	"github.com/loicsikidi/go-tpm-kit/tpmtest"
 )
 
 func TestSessionKey_CheckAndSetDefault(t *testing.T) {
-	tpm := testutil.OpenSimulator(t)
+	tpm := tpmtest.OpenSimulator(t)
 
 	// Create a test SRK
 	name, public := getSRK(t, tpm, 0x81000001)
@@ -116,7 +121,7 @@ func TestSessionKey_CheckAndSetDefault(t *testing.T) {
 }
 
 func TestSessionKey_Serialization(t *testing.T) {
-	tpm := testutil.OpenSimulator(t)
+	tpm := tpmtest.OpenSimulator(t)
 
 	// Create a test SRK
 	name, public := getSRK(t, tpm, 0x81000001)
@@ -255,7 +260,7 @@ func TestSessionKey_Serialization(t *testing.T) {
 }
 
 func TestCreateSessionKey(t *testing.T) {
-	tpm := testutil.OpenSimulator(t)
+	tpm := tpmtest.OpenSimulator(t)
 
 	// Create SRK for testing
 	name, public := getSRK(t, tpm, 0x81000001)
