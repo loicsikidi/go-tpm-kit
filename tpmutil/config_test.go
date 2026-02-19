@@ -1,3 +1,8 @@
+// Copyright (c) 2025, Loïc Sikidi
+// All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package tpmutil_test
 
 import (
@@ -7,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
+	"github.com/loicsikidi/go-tpm-kit/tpmtest"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
@@ -190,7 +195,7 @@ func TestSignConfigValidation(t *testing.T) {
 }
 
 func TestHashConfigValidation(t *testing.T) {
-	thetpm := testutil.OpenSimulator(t)
+	thetpm := tpmtest.OpenSimulator(t)
 
 	data := []byte("test data")
 
