@@ -158,7 +158,7 @@ func TestSignConfigValidation(t *testing.T) {
 			wantErr: tpmutil.ErrMissingData,
 		},
 		{
-			name:    "nil PublicKey",
+			name:    "nil PublicKey without PublicGetter",
 			cfg:     tpmutil.SignConfig{KeyHandle: tpmutil.NewHandle(&tpm2.NamedHandle{}), Digest: []byte("test")},
 			wantErr: tpmutil.ErrMissingPublicKey,
 		},
@@ -192,6 +192,51 @@ func TestSignConfigValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSignConfigValidation_PublicKeyFromHandle(t *testing.T) {
+	thetpm := tpmtest.OpenSimulator(t)
+
+	template := tpmutil.MustApplicationKeyTemplate()
+	keyHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
+		InPublic: template,
+	})
+	if err != nil {
+		t.Fatalf("CreatePrimary failed: %v", err)
+	}
+	defer keyHandle.Close()
+
+	t.Run("nil PublicKey auto-populated from KeyHandle", func(t *testing.T) {
+		cfg := tpmutil.SignConfig{
+			KeyHandle: keyHandle,
+			Digest:    []byte("test"),
+		}
+		if err := cfg.CheckAndSetDefault(); err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+		if cfg.PublicKey == nil {
+			t.Error("expected PublicKey to be auto-populated from KeyHandle")
+		}
+		if cfg.SignerOpts == nil {
+			t.Error("expected SignerOpts to be set to default")
+		}
+	})
+
+	t.Run("nil PublicKey with KeyHandle without public area", func(t *testing.T) {
+		handle := tpmutil.NewHandleCloser(thetpm, &tpm2.NamedHandle{
+			Handle: keyHandle.Handle(),
+			Name:   keyHandle.Name(),
+		})
+		defer handle.Close()
+
+		cfg := tpmutil.SignConfig{
+			KeyHandle: handle,
+			Digest:    []byte("test"),
+		}
+		if err := cfg.CheckAndSetDefault(); err != tpmutil.ErrMissingPublicKey {
+			t.Errorf("expected error %v, got %v", tpmutil.ErrMissingPublicKey, err)
+		}
+	})
 }
 
 func TestHashConfigValidation(t *testing.T) {

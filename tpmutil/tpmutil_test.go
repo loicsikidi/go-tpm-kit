@@ -8,6 +8,7 @@ package tpmutil_test
 import (
 	"bytes"
 	"crypto"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
@@ -410,93 +411,65 @@ func TestHashWithCustomConfig(t *testing.T) {
 func TestSign(t *testing.T) {
 	thetpm := tpmtest.OpenSimulator(t)
 
-	// Create a primary signing key
-	signingTemplate := tpm2.TPMTPublic{
-		Type:    tpm2.TPMAlgECC,
-		NameAlg: tpm2.TPMAlgSHA256,
-		ObjectAttributes: tpm2.TPMAObject{
-			SignEncrypt:         true,
-			FixedTPM:            true,
-			FixedParent:         true,
-			SensitiveDataOrigin: true,
-			UserWithAuth:        true,
-		},
-		Parameters: tpm2.NewTPMUPublicParms(
-			tpm2.TPMAlgECC,
-			&tpm2.TPMSECCParms{
-				Scheme: tpm2.TPMTECCScheme{
-					Scheme: tpm2.TPMAlgECDSA,
-					Details: tpm2.NewTPMUAsymScheme(
-						tpm2.TPMAlgECDSA,
-						&tpm2.TPMSSigSchemeECDSA{
-							HashAlg: tpm2.TPMAlgSHA256,
-						},
-					),
-				},
-				CurveID: tpm2.TPMECCNistP256,
-			},
-		),
-	}
-
-	createPrimary := tpm2.CreatePrimary{
-		PrimaryHandle: tpm2.TPMRHOwner,
-		InPublic:      tpm2.New2B(signingTemplate),
-	}
-
-	rsp, err := createPrimary.Execute(thetpm)
+	template := tpmutil.MustApplicationKeyTemplate()
+	keyHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
+		InPublic: template,
+	})
 	if err != nil {
 		t.Fatalf("CreatePrimary() failed: %v", err)
 	}
-	defer func() {
-		flushContext := tpm2.FlushContext{FlushHandle: rsp.ObjectHandle}
-		if _, err := flushContext.Execute(thetpm); err != nil {
-			t.Errorf("FlushContext() failed: %v", err)
-		}
-	}()
+	defer keyHandle.Close()
 
-	// Get the public key
-	pub, err := rsp.OutPublic.Contents()
-	if err != nil {
-		t.Fatalf("OutPublic.Contents() failed: %v", err)
-	}
-
-	pubKey, err := tpmcrypto.PublicKey(pub)
+	pubKey, err := tpmcrypto.PublicKey(keyHandle.Public())
 	if err != nil {
 		t.Fatalf("PublicKey() failed: %v", err)
 	}
 
-	// Hash some data (required for signing)
 	hashCfg := tpmutil.HashConfig{Data: []byte("sign this message")}
 	result, err := tpmutil.Hash(thetpm, hashCfg)
 	if err != nil {
 		t.Fatalf("Hash() failed: %v", err)
 	}
-	if result == nil {
-		t.Fatal("Hash() returned nil result")
+
+	ecdsaPubKey, ok := pubKey.(*ecdsa.PublicKey)
+	if !ok {
+		t.Fatalf("expected *ecdsa.PublicKey, got %T", pubKey)
 	}
 
-	// Sign the digest
-	handle := tpmutil.NewHandle(&tpm2.NamedHandle{
-		Handle: rsp.ObjectHandle,
-		Name:   rsp.Name,
+	t.Run("with explicit PublicKey", func(t *testing.T) {
+		cfg := tpmutil.SignConfig{
+			KeyHandle:  keyHandle,
+			Digest:     result.Digest,
+			PublicKey:  pubKey,
+			SignerOpts: crypto.SHA256,
+			Validation: result.Validation,
+		}
+
+		signature, err := tpmutil.Sign(thetpm, cfg)
+		if err != nil {
+			t.Fatalf("Sign() failed: %v", err)
+		}
+		if !ecdsa.VerifyASN1(ecdsaPubKey, result.Digest, signature) {
+			t.Error("signature verification failed")
+		}
 	})
 
-	cfg := tpmutil.SignConfig{
-		KeyHandle:  handle,
-		Digest:     result.Digest,
-		PublicKey:  pubKey,
-		SignerOpts: crypto.SHA256,
-		Validation: result.Validation,
-	}
+	t.Run("without PublicKey auto-populated from KeyHandle", func(t *testing.T) {
+		cfg := tpmutil.SignConfig{
+			KeyHandle:  keyHandle,
+			Digest:     result.Digest,
+			SignerOpts: crypto.SHA256,
+			Validation: result.Validation,
+		}
 
-	signature, err := tpmutil.Sign(thetpm, cfg)
-	if err != nil {
-		t.Fatalf("Sign() failed: %v", err)
-	}
-
-	if len(signature) < 70 || len(signature) > 73 {
-		t.Errorf("Expected signature length between 70-73, got %d", len(signature))
-	}
+		signature, err := tpmutil.Sign(thetpm, cfg)
+		if err != nil {
+			t.Fatalf("Sign() failed: %v", err)
+		}
+		if !ecdsa.VerifyASN1(ecdsaPubKey, result.Digest, signature) {
+			t.Error("signature verification failed")
+		}
+	})
 }
 
 func TestNVRead(t *testing.T) {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/go-tpm/tpm2"
 	tpmkit "github.com/loicsikidi/go-tpm-kit"
+	"github.com/loicsikidi/go-tpm-kit/tpmcrypto"
 )
 
 // HashConfig holds configuration for TPM hash operations.
@@ -58,10 +59,15 @@ type SignConfig struct {
 	// Digest to sign.
 	Digest []byte
 	// PublicKey for scheme determination.
+	//
+	// Important: this field is deprecated and will be removed in future versions.
+	// Use a key handle that implements [PublicGetter] instead (eg. [HandleCloser]).
+	//
+	// Default: auto-populated from KeyHandle if available (ie. [PublicGetter]).
 	PublicKey crypto.PublicKey
 	// SignerOpts for signing options (hash algorithm, etc.).
 	//
-	// Default: crypto.SHA256
+	// Default: [crypto.SHA256]
 	SignerOpts crypto.SignerOpts
 	// Validation ticket from TPM hash operation.
 	//
@@ -78,7 +84,15 @@ func (c *SignConfig) CheckAndSetDefault() error {
 		return ErrMissingData
 	}
 	if c.PublicKey == nil {
-		return ErrMissingPublicKey
+		if pk, ok := c.KeyHandle.(PublicGetter); ok && pk.HasPublic() {
+			pub, err := tpmcrypto.PublicKey(pk.Public())
+			if err != nil {
+				return err
+			}
+			c.PublicKey = pub
+		} else {
+			return ErrMissingPublicKey
+		}
 	}
 	if c.SignerOpts == nil {
 		c.SignerOpts = crypto.SHA256
