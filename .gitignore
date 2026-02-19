@@ -19,6 +19,7 @@ go.work.sum
 
 # Dependency directories
 vendor/
+vendors/
 
 # IDE/Editor specific files
 .vscode/
@@ -29,7 +30,8 @@ vendor/
 .DS_Store
 
 # AI assistant
-.claude/
+.claude/*
+!.claude/skills/
 GOAL.md
 
 # Nix build artifacts
