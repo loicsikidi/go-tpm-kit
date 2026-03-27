@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/loicsikidi/go-tpm-kit/tpmtest"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
@@ -195,7 +195,7 @@ func TestSignConfigValidation(t *testing.T) {
 }
 
 func TestSignConfigValidation_PublicKeyFromHandle(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	template := tpmutil.MustApplicationKeyTemplate()
 	keyHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
@@ -240,7 +240,7 @@ func TestSignConfigValidation_PublicKeyFromHandle(t *testing.T) {
 }
 
 func TestHashConfigValidation(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	data := []byte("test data")
 

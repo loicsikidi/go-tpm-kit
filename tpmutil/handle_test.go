@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/go-tpm/tpm2"
 	tpmkit "github.com/loicsikidi/go-tpm-kit"
-	"github.com/loicsikidi/go-tpm-kit/tpmtest"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 )
 
 func TestHandleType_String(t *testing.T) {
@@ -187,7 +187,7 @@ func TestNewHandle(t *testing.T) {
 }
 
 func TestNewHandleCloser(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	createPrimary := tpm2.CreatePrimary{
 		PrimaryHandle: tpm2.TPMRHOwner,
@@ -272,7 +272,7 @@ func TestIsAuthHandle(t *testing.T) {
 }
 
 func TestAsHandle(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	t.Run("from TPMHandle", func(t *testing.T) {
 		// Create a primary key to get a valid handle
@@ -337,7 +337,7 @@ func TestAsHandle(t *testing.T) {
 }
 
 func TestToHandleCloser(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	t.Run("from TPMHandle", func(t *testing.T) {
 		createPrimary := tpm2.CreatePrimary{
@@ -502,7 +502,7 @@ func TestTpmHandleMethods(t *testing.T) {
 	})
 
 	t.Run("Public() method - with public", func(t *testing.T) {
-		thetpm := tpmtest.OpenSimulator(t)
+		thetpm := testutil.OpenSimulator(t)
 
 		createPrimary := tpm2.CreatePrimary{
 			PrimaryHandle: tpm2.TPMRHOwner,

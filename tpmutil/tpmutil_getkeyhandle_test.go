@@ -10,12 +10,12 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/loicsikidi/go-tpm-kit/tpmtest"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
 func TestGetKeyHandle_NotFound(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	persistentHandle := tpm2.TPMHandle(0x81000099)
 
@@ -59,7 +59,7 @@ func TestGetKeyHandle_AlreadyPersisted(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			thetpm := tpmtest.OpenSimulator(t)
+			thetpm := testutil.OpenSimulator(t)
 
 			// Create a transient primary key
 			primaryHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
@@ -103,7 +103,7 @@ func TestGetKeyHandle_AlreadyPersisted(t *testing.T) {
 }
 
 func TestGetKeyHandle_ConfigValidation(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	tests := []struct {
 		name    string

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/loicsikidi/go-tpm-kit/tpmtest"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
@@ -67,7 +67,7 @@ func TestPersistEK_CreateNew(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			thetpm := tpmtest.OpenSimulator(t)
+			thetpm := testutil.OpenSimulator(t)
 
 			// Determine KeyFamily based on keyType
 			var keyFamily tpmutil.KeyFamily
@@ -115,7 +115,7 @@ func TestPersistEK_CreateNew(t *testing.T) {
 }
 
 func TestPersistEK_WithTransientKey(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	// Create a transient EK manually
 	transientEK, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
@@ -163,7 +163,7 @@ func TestPersistEK_WithTransientKey(t *testing.T) {
 }
 
 func TestPersistEK_CustomHandle(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	customHandle := tpm2.TPMHandle(0x81010020)
 
@@ -204,7 +204,7 @@ func TestPersistEK_CustomHandle(t *testing.T) {
 
 func TestPersistEK_HandleAlreadyOccupied(t *testing.T) {
 	t.Run("WithoutForce", func(t *testing.T) {
-		thetpm := tpmtest.OpenSimulator(t)
+		thetpm := testutil.OpenSimulator(t)
 
 		// First, persist an EK at the default RSA handle
 		cfg1 := tpmutil.EKParentConfig{
@@ -237,7 +237,7 @@ func TestPersistEK_HandleAlreadyOccupied(t *testing.T) {
 	})
 
 	t.Run("WithForce", func(t *testing.T) {
-		thetpm := tpmtest.OpenSimulator(t)
+		thetpm := testutil.OpenSimulator(t)
 
 		// First, persist an EK at the default RSA handle (low-range template)
 		cfg1 := tpmutil.EKParentConfig{
@@ -316,7 +316,7 @@ func TestPersistEK_HandleAlreadyOccupied(t *testing.T) {
 }
 
 func TestPersistEK_MissingKeyType(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	cfg := tpmutil.EKParentConfig{
 		KeyFamily: tpmutil.RSA,
@@ -330,7 +330,7 @@ func TestPersistEK_MissingKeyType(t *testing.T) {
 }
 
 func TestPersistEK_DefaultConfig(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	// Using default config should fail because KeyType is required
 	_, err := tpmutil.PersistEK(thetpm)
