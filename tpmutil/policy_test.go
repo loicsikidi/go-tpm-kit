@@ -9,12 +9,12 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/loicsikidi/go-tpm-kit/tpmtest"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
 func TestEkPolicyCallback(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	// Start a policy session
 	sess, closer, err := tpm2.PolicySession(thetpm, tpm2.TPMAlgSHA256, 16, tpm2.Trial())

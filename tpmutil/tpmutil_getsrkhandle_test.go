@@ -10,12 +10,12 @@ import (
 
 	"github.com/google/go-tpm/tpm2"
 	tpmkit "github.com/loicsikidi/go-tpm-kit"
-	"github.com/loicsikidi/go-tpm-kit/tpmtest"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
 func TestGetSKRHandle_CreateNew_RSA(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	cfg := tpmutil.ParentConfig{
 		KeyFamily: tpmutil.RSA,
@@ -49,7 +49,7 @@ func TestGetSKRHandle_CreateNew_RSA(t *testing.T) {
 }
 
 func TestGetSKRHandle_CreateNew_ECC(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	cfg := tpmutil.ParentConfig{
 		KeyFamily: tpmutil.ECC,
@@ -83,7 +83,7 @@ func TestGetSKRHandle_CreateNew_ECC(t *testing.T) {
 }
 
 func TestGetSKRHandle_AlreadyPersisted_SKR(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	// First, create and persist an RSA SRK
 	cfg := tpmutil.ParentConfig{
@@ -127,7 +127,7 @@ func TestGetSKRHandle_AlreadyPersisted_SKR(t *testing.T) {
 }
 
 func TestGetSKRHandle_CustomOwnerPassword(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	// Set a custom owner hierarchy password
 	ownerPassword := []byte("custom-owner-password")
@@ -158,7 +158,7 @@ func TestGetSKRHandle_CustomOwnerPassword(t *testing.T) {
 }
 
 func TestGetSKRHandle_NonStandardHandle(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	// Use a non-standard persistent handle
 	customHandle := tpm2.TPMHandle(0x81000010)

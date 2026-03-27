@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
+	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 	"github.com/loicsikidi/go-tpm-kit/tpmcrypto"
-	"github.com/loicsikidi/go-tpm-kit/tpmtest"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
@@ -528,7 +528,7 @@ func indexSubstring(s, substr string) int {
 // capabilities and that these templates can be used to successfully create
 // keys in the TPM.
 func TestNewAKTemplate(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	// Create SRK first
 	srkHandle, err := tpmutil.GetSKRHandle(thetpm, tpmutil.ParentConfig{})
@@ -627,7 +627,7 @@ func TestNewAKTemplate(t *testing.T) {
 // supported by the TPM simulator (either size limitations or unsupported
 // signature schemes).
 func TestAKCertifyCreation(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	tests := []struct {
 		name   string
@@ -762,7 +762,7 @@ func TestAKCertifyCreation(t *testing.T) {
 // supported by the TPM simulator (either size limitations or unsupported
 // signature schemes).
 func TestNewApplicationKeyTemplate(t *testing.T) {
-	thetpm := tpmtest.OpenSimulator(t)
+	thetpm := testutil.OpenSimulator(t)
 
 	// Create SRK first
 	srkHandle, err := tpmutil.GetSKRHandle(thetpm, tpmutil.ParentConfig{})
