@@ -13,10 +13,16 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
+
+	"github.com/loicsikidi/go-tpm-kit/tpmcert/oid"
+	"github.com/loicsikidi/go-tpm-kit/tpmcert/x509ext"
 )
+
+var ErrEKInvalidSAN = errors.New("subject alternative name must contain TPMManufacturer, TPMModel, and TPMVersion with valid values")
 
 // CA represents a two-level certificate authority (Root + Intermediate).
 //
@@ -108,11 +114,11 @@ type CertificateRequest struct {
 	//
 	// Required for EK certificates. Must contain TPMManufacturer, TPMModel,
 	// and TPMVersion.
-	SAN *SubjectAltName
+	SAN *x509ext.SubjectAltName
 	// TPMSpec is the TPM specification to include in the certificate.
 	//
 	// Optional.
-	TPMSpec *TPMSpecification
+	TPMSpec *x509ext.TPMSpecification
 }
 
 // CheckAndSetDefault checks and sets default values for the certificate request.
@@ -124,7 +130,7 @@ func (c *CertificateRequest) CheckAndSetDefault() error {
 		return fmt.Errorf("missing parameter NotAfter")
 	}
 	if c.SAN == nil || c.SAN.TPMManufacturer == "" || c.SAN.TPMModel == "" || c.SAN.TPMVersion == "" {
-		return fmt.Errorf("invalid SubjectAltName: TPMManufacturer, TPMModel, and TPMVersion are required")
+		return ErrEKInvalidSAN
 	}
 	return nil
 }
@@ -175,7 +181,7 @@ func (ca *CA) GenerateCertificate(req CertificateRequest) ([]byte, error) {
 		NotBefore:          time.Now().UTC().Add(-1 * time.Minute),
 		NotAfter:           req.NotAfter,
 		KeyUsage:           keyUsage,
-		UnknownExtKeyUsage: []asn1.ObjectIdentifier{OIDEKCertificate},
+		UnknownExtKeyUsage: []asn1.ObjectIdentifier{oid.EKCertificate},
 		ExtraExtensions:    extensions,
 		// BasicConstraintsValid is true to not allow any intermediate certs.
 		BasicConstraintsValid: true,
@@ -208,7 +214,7 @@ func getExtensions(req CertificateRequest) ([]pkix.Extension, error) {
 	critical := (req.Subject.String() == "")
 
 	if req.SAN != nil {
-		san, err := MarshalSubjectAltName(req.SAN, critical)
+		san, err := x509ext.MarshalSubjectAltName(req.SAN, critical)
 		if err != nil {
 			return nil, fmt.Errorf("marshal subject alt name: %w", err)
 		}
@@ -216,7 +222,7 @@ func getExtensions(req CertificateRequest) ([]pkix.Extension, error) {
 	}
 
 	if req.TPMSpec != nil {
-		spec, err := MarshalTpmSpecification(req.TPMSpec, critical)
+		spec, err := x509ext.MarshalTpmSpecification(req.TPMSpec, critical)
 		if err != nil {
 			return nil, fmt.Errorf("marshal tpm specification: %w", err)
 		}

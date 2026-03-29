@@ -12,6 +12,7 @@ import (
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 
+	"github.com/loicsikidi/go-tpm-kit/tpmcert/x509ext"
 	"github.com/loicsikidi/go-tpm-kit/tpmtest/ekca"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
@@ -66,7 +67,7 @@ func provisionEK(t *testing.T, tpm transport.TPM, ca *ekca.CA, template Template
 	certDER, err := ca.GenerateCertificate(ekca.CertificateRequest{
 		PublicKey: publicKey,
 		NotAfter:  time.Now().Add(defaultValidityMinutes * time.Minute),
-		SAN: &ekca.SubjectAltName{
+		SAN: &x509ext.SubjectAltName{
 			TPMManufacturer: defaultTPMManufacturer,
 			TPMModel:        defaultTPMModel,
 			TPMVersion:      defaultTPMVersion,
