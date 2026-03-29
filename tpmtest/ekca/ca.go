@@ -95,11 +95,18 @@ func (ca *CA) Verify(cert *x509.Certificate) error {
 	return err
 }
 
+type certRequester interface {
+	GetPublicKey() crypto.PublicKey
+	Subject() pkix.Name
+	SAN() *x509ext.SubjectAltName
+	TPMSpec() *x509ext.TPMSpecification
+}
+
 // CertificateRequest is a request to generate an EK certificate.
 type CertificateRequest struct {
 	// PublicKey is the public key to sign.
 	//
-	// Required.
+	// Required (unless provided via CertRequest).
 	PublicKey crypto.PublicKey
 	// NotAfter is the time after which the issued certificate will be no longer valid.
 	//
@@ -112,17 +119,33 @@ type CertificateRequest struct {
 	Subject pkix.Name
 	// SAN is the Subject Alternative Name to include in the certificate.
 	//
-	// Required for EK certificates. Must contain TPMManufacturer, TPMModel,
+	// Required for EK certificates (unless provided via CertRequest). Must contain TPMManufacturer, TPMModel,
 	// and TPMVersion.
 	SAN *x509ext.SubjectAltName
 	// TPMSpec is the TPM specification to include in the certificate.
 	//
 	// Optional.
 	TPMSpec *x509ext.TPMSpecification
+
+	// CertRequester is an optional interface that can be used to
+	// populate the certificate request fields.
+	//
+	// When provided, this interface overrides PublicKey, Subject, SAN, and TPMSpec fields
+	// during [CertificateRequest.CheckAndSetDefault].
+	//
+	// Optional.
+	CertRequester certRequester
 }
 
 // CheckAndSetDefault checks and sets default values for the certificate request.
 func (c *CertificateRequest) CheckAndSetDefault() error {
+	if c.CertRequester != nil {
+		c.PublicKey = c.CertRequester.GetPublicKey()
+		c.Subject = c.CertRequester.Subject()
+		c.SAN = c.CertRequester.SAN()
+		c.TPMSpec = c.CertRequester.TPMSpec()
+	}
+
 	if c.PublicKey == nil {
 		return fmt.Errorf("missing parameter PublicKey")
 	}

@@ -36,6 +36,7 @@ I've seen myself re-implementing similar functionalities across different projec
 This repo depends on:
 * [`go-tpm`](https://github.com/google/go-tpm) - TPM 2.0 library for Go
 * [`golang.org/x/term`](https://pkg.go.dev/golang.org/x/term) - Terminal utilities for secure password input
+* [`cenkalti/backoff`](https://github.com/cenkalti/backoff) - Exponential backoff and retry utilities
 
 ## Development
 
