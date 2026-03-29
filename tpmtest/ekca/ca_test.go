@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	tpmoid "github.com/loicsikidi/go-tpm-kit/tpmcert/oid"
+	"github.com/loicsikidi/go-tpm-kit/tpmcert/x509ext"
 	"github.com/loicsikidi/go-tpm-kit/tpmtest/ekca"
 )
 
@@ -109,7 +111,7 @@ func TestGenerateCertificate(t *testing.T) {
 			req := ekca.CertificateRequest{
 				PublicKey: publicKey,
 				NotAfter:  time.Now().AddDate(1, 0, 0),
-				SAN: &ekca.SubjectAltName{
+				SAN: &x509ext.SubjectAltName{
 					TPMManufacturer: "id:53494D55",
 					TPMModel:        "test-model",
 					TPMVersion:      "id:00000001",
@@ -117,7 +119,7 @@ func TestGenerateCertificate(t *testing.T) {
 			}
 
 			if tt.withTPMSpec {
-				req.TPMSpec = &ekca.TPMSpecification{
+				req.TPMSpec = &x509ext.TPMSpecification{
 					Family:   "2.0",
 					Level:    0,
 					Revision: 116,
@@ -149,7 +151,7 @@ func TestGenerateCertificate(t *testing.T) {
 			// Verify EK certificate OID
 			found := false
 			for _, oid := range cert.UnknownExtKeyUsage {
-				if oid.Equal(ekca.OIDEKCertificate) {
+				if oid.Equal(tpmoid.EKCertificate) {
 					found = true
 					break
 				}
@@ -167,7 +169,7 @@ func TestGenerateCertificate(t *testing.T) {
 			if tt.withTPMSpec {
 				found := false
 				for _, ext := range cert.Extensions {
-					if ext.Id.Equal(ekca.OIDSubjectDirectoryAttributes) {
+					if ext.Id.Equal(tpmoid.SubjectDirectoryAttributes) {
 						found = true
 						break
 					}
@@ -191,7 +193,7 @@ func TestCertificateRequest_Validation(t *testing.T) {
 			req: ekca.CertificateRequest{
 				PublicKey: &rsa.PublicKey{N: big.NewInt(1), E: 65537},
 				NotAfter:  time.Now().AddDate(1, 0, 0),
-				SAN: &ekca.SubjectAltName{
+				SAN: &x509ext.SubjectAltName{
 					TPMManufacturer: "id:53494D55",
 					TPMModel:        "test-model",
 					TPMVersion:      "id:00000001",
@@ -203,7 +205,7 @@ func TestCertificateRequest_Validation(t *testing.T) {
 			name: "missing public key",
 			req: ekca.CertificateRequest{
 				NotAfter: time.Now().AddDate(1, 0, 0),
-				SAN: &ekca.SubjectAltName{
+				SAN: &x509ext.SubjectAltName{
 					TPMManufacturer: "id:53494D55",
 					TPMModel:        "test-model",
 					TPMVersion:      "id:00000001",
@@ -215,7 +217,7 @@ func TestCertificateRequest_Validation(t *testing.T) {
 			name: "missing NotAfter",
 			req: ekca.CertificateRequest{
 				PublicKey: &rsa.PublicKey{N: big.NewInt(1), E: 65537},
-				SAN: &ekca.SubjectAltName{
+				SAN: &x509ext.SubjectAltName{
 					TPMManufacturer: "id:53494D55",
 					TPMModel:        "test-model",
 					TPMVersion:      "id:00000001",
@@ -236,7 +238,7 @@ func TestCertificateRequest_Validation(t *testing.T) {
 			req: ekca.CertificateRequest{
 				PublicKey: &rsa.PublicKey{N: big.NewInt(1), E: 65537},
 				NotAfter:  time.Now().AddDate(1, 0, 0),
-				SAN: &ekca.SubjectAltName{
+				SAN: &x509ext.SubjectAltName{
 					TPMManufacturer: "id:53494D55",
 					// Missing TPMModel and TPMVersion
 				},

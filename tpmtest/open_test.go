@@ -12,8 +12,8 @@ import (
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 
+	tpmoid "github.com/loicsikidi/go-tpm-kit/tpmcert/oid"
 	"github.com/loicsikidi/go-tpm-kit/tpmtest"
-	"github.com/loicsikidi/go-tpm-kit/tpmtest/ekca"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
@@ -82,7 +82,7 @@ func verifyCertInNV(t *testing.T, tpm transport.TPM, index tpm2.TPMHandle) {
 	// Verify EK certificate OID in extended key usage
 	found := false
 	for _, oid := range cert.UnknownExtKeyUsage {
-		if oid.Equal(ekca.OIDEKCertificate) {
+		if oid.Equal(tpmoid.EKCertificate) {
 			found = true
 			break
 		}

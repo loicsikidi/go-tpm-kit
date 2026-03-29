@@ -28,6 +28,8 @@ I've seen myself re-implementing similar functionalities across different projec
 | [`tpmcrypto`](./tpmcrypto/) | Provides cryptographic utilities and abstractions for working with TPM keys and signatures | ❌ |
 | [`tpmsession`](./tpmsession/) | Provides utilities for creating and managing encrypted TPM sessions (ie. parameter encryption, HMAC protection and Audit)  | ✅ |
 | [`tpmtest`](./tpmtest/) | Provides test helpers for working with the TPM simulator (e.g., opening a simulator connection with automatic cleanup) | ❌ |
+| [`tpmcert`](./tpmcert/) | Provides utilities for working with TPM-related X.509 certificates and extensions (e.g., parsing EK certificates, handling TCG-specific OIDs) | ❌ |
+| [`manufacturer`](./manufacturer/) | Provides utilities for working with TPM manufacturer IDs (e.g., mapping vendor IDs to manufacturer names) | ❌ |
 
 ## Dependencies
 

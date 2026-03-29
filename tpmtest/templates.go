@@ -1,5 +1,5 @@
 // This file is a mix of a copy from
-//   - https://github.com/loicsikidi/attest/blob/main/endorsement/templates.go
+//   - https://github.com/loicsikidi/go-tpm-kit/tpmcert/blob/main/endorsement/templates.go
 //   - and constants.go (i.e. tpmutil pkg)
 //
 // to avoid a circular dependency.
