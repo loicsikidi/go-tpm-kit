@@ -19,7 +19,7 @@ import (
 
 const (
 	// defaultTPMManufacturer is the default TPM manufacturer for simulator certificates.
-	defaultTPMManufacturer = "id:53494D55" // "SIMU" in hex
+	defaultTPMManufacturer = "SIM0"
 	// defaultTPMModel is the default TPM model for simulator certificates.
 	defaultTPMModel = "tpmtest-simulator"
 	// defaultTPMVersion is the default TPM version for simulator certificates.
