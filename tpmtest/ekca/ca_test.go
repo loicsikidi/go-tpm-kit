@@ -214,18 +214,6 @@ func TestCertificateRequest_Validation(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "missing NotAfter",
-			req: ekca.CertificateRequest{
-				PublicKey: &rsa.PublicKey{N: big.NewInt(1), E: 65537},
-				SAN: &x509ext.SubjectAltName{
-					TPMManufacturer: "id:53494D55",
-					TPMModel:        "test-model",
-					TPMVersion:      "id:00000001",
-				},
-			},
-			wantErr: true,
-		},
-		{
 			name: "missing SAN",
 			req: ekca.CertificateRequest{
 				PublicKey: &rsa.PublicKey{N: big.NewInt(1), E: 65537},

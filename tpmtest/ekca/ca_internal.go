@@ -18,10 +18,12 @@ import (
 )
 
 const (
-	// defaultRootValidity is the default validity period for root certificates.
-	defaultRootValidity = 1 * time.Hour
-	// defaultIntermediateValidity is the default validity period for intermediate certificates.
-	defaultIntermediateValidity = 10 * time.Minute
+	// DefaultRootValidity is the default validity period for root certificates.
+	DefaultRootValidity = 1 * time.Hour
+	// DefaultIntermediateValidity is the default validity period for intermediate certificates.
+	DefaultIntermediateValidity = 30 * time.Minute
+	// DefaultLeafValidity is the default validity period for leaf certificates.
+	DefaultLeafValidity = 10 * time.Minute
 )
 
 // generateECDSAKey generates a new ECDSA private key using P-256 curve.
@@ -49,7 +51,7 @@ func createRootCertificate(signer crypto.Signer) (*x509.Certificate, error) {
 			CommonName:   "TPM Simulator Root CA",
 		},
 		NotBefore:             now.Add(-1 * time.Minute),
-		NotAfter:              now.Add(defaultRootValidity),
+		NotAfter:              now.Add(DefaultRootValidity),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 		BasicConstraintsValid: true,
 		IsCA:                  true,
@@ -86,7 +88,7 @@ func createIntermediateCertificate(rootCert *x509.Certificate, rootSigner crypto
 			CommonName:   "TPM Simulator Intermediate CA",
 		},
 		NotBefore:             now.Add(-1 * time.Minute),
-		NotAfter:              now.Add(defaultIntermediateValidity),
+		NotAfter:              now.Add(DefaultIntermediateValidity),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 		BasicConstraintsValid: true,
 		IsCA:                  true,

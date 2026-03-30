@@ -59,9 +59,9 @@ type EKCertRequester interface {
 // Source: https://trustedcomputinggroup.org/wp-content/uploads/TCG-EK-Credential-Profile-for-TPM-Family-2.0-Level-0-Version-2.6_pub.pdf
 //
 // Notes:
-//   - this resource is intented to be used ONLY by the Trust Service (i.e. backend).
-//   - the struct is able to validate the EK certificate based on the spec
+//   - the struct is able to validate the EK certificate based on the spec (revocation included)
 //   - the struct exposes nicely parsed EK certificate extensions (e.g. SAN, TPM Specification)
+//   - the struct can be used as a pivot to create Local EK (LEK) certificates (see [EKCertRequester] for details)
 type EKCertificate struct {
 	EKCertRequester
 	cert             *x509.Certificate
@@ -110,7 +110,8 @@ func (cfg *Config) CheckAndSetDefault() error {
 	return nil
 }
 
-func NewEKCertificate(cert *x509.Certificate, optionalCfg ...Config) (*EKCertificate, error) {
+// New creates a new [EKCertificate] instance from the given [x509.Certificate].
+func New(cert *x509.Certificate, optionalCfg ...Config) (*EKCertificate, error) {
 	cfg := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
