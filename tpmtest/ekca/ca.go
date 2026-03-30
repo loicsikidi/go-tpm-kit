@@ -150,7 +150,7 @@ func (c *CertificateRequest) CheckAndSetDefault() error {
 		return fmt.Errorf("missing parameter PublicKey")
 	}
 	if c.NotAfter.IsZero() {
-		return fmt.Errorf("missing parameter NotAfter")
+		c.NotAfter = time.Now().Add(DefaultLeafValidity)
 	}
 	if c.SAN == nil || c.SAN.TPMManufacturer == "" || c.SAN.TPMModel == "" || c.SAN.TPMVersion == "" {
 		return ErrEKInvalidSAN
