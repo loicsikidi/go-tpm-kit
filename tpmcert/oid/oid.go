@@ -1,3 +1,8 @@
+// Copyright (c) 2026, Loïc Sikidi
+// All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 // Package oid contains X.509 and TCG ASN.1 object identifiers.
 package oid
 
