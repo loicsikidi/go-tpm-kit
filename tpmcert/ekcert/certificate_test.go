@@ -13,7 +13,7 @@ import (
 
 	"github.com/loicsikidi/go-tpm-kit/internal/utils"
 	crlutil "github.com/loicsikidi/go-tpm-kit/internal/utils/crl"
-	"github.com/loicsikidi/go-tpm-kit/tpmtest/ekca"
+	"github.com/loicsikidi/go-tpm-kit/tpmcert/ekca"
 	testutil "github.com/loicsikidi/go-tpm-kit/tpmtest/testutil/ek"
 )
 
@@ -22,7 +22,7 @@ func TestNewEKCertificate(t *testing.T) {
 		t.Helper()
 		t.Log("Mocking HTTP client for EK certificate validation")
 
-		localCA, err := ekca.NewCA()
+		localCA, err := ekca.New()
 		if err != nil {
 			t.Fatalf("failed to create local CA: %v", err)
 		}

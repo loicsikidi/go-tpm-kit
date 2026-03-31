@@ -6,20 +6,29 @@
 package tpmtest
 
 import (
+	"crypto/x509/pkix"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/go-tpm/tpm2/transport"
 	"github.com/google/go-tpm/tpm2/transport/simulator"
 
 	"github.com/loicsikidi/go-tpm-kit/internal/utils"
-	"github.com/loicsikidi/go-tpm-kit/tpmtest/ekca"
+	"github.com/loicsikidi/go-tpm-kit/tpmcert/ekca"
 )
 
 var (
 	caOnce     sync.Once
 	caInstance *ekca.CA
 	caErr      error
+)
+
+const (
+	// defaultRootValidity is the default validity period for root certificates.
+	defaultRootValidity = 1 * time.Hour
+	// defaultIntermediateValidity is the default validity period for intermediate certificates.
+	defaultIntermediateValidity = 30 * time.Minute
 )
 
 // GetEndorsementCA returns the singleton [ekca.CA] instance.
@@ -29,7 +38,23 @@ var (
 // the same CA across all tests.
 func GetEndorsementCA() (*ekca.CA, error) {
 	caOnce.Do(func() {
-		caInstance, caErr = ekca.NewCA()
+		cfg := ekca.CAConfig{
+			Root: &ekca.CertConfig{
+				Subject: &pkix.Name{
+					Organization: []string{"go-tpm-kit"},
+					CommonName:   "TPM Simulator Root CA",
+				},
+				Validity: defaultRootValidity,
+			},
+			Intermediate: &ekca.CertConfig{
+				Subject: &pkix.Name{
+					Organization: []string{"go-tpm-kit"},
+					CommonName:   "TPM Simulator Intermediate CA",
+				},
+				Validity: defaultIntermediateValidity,
+			},
+		}
+		caInstance, caErr = ekca.New(cfg)
 	})
 	return caInstance, caErr
 }
