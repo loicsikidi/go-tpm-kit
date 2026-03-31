@@ -19,11 +19,11 @@ import (
 
 const (
 	// DefaultRootValidity is the default validity period for root certificates.
-	DefaultRootValidity = 1 * time.Hour
+	DefaultRootValidity = 30 * 365 * 24 * time.Hour
 	// DefaultIntermediateValidity is the default validity period for intermediate certificates.
-	DefaultIntermediateValidity = 30 * time.Minute
+	DefaultIntermediateValidity = 25 * 365 * 24 * time.Hour
 	// DefaultLeafValidity is the default validity period for leaf certificates.
-	DefaultLeafValidity = 10 * time.Minute
+	DefaultLeafValidity = 20 * 365 * 24 * time.Hour
 )
 
 // generateECDSAKey generates a new ECDSA private key using P-256 curve.
@@ -36,7 +36,14 @@ func generateECDSAKey() (*ecdsa.PrivateKey, error) {
 }
 
 // createRootCertificate creates a self-signed root CA certificate.
-func createRootCertificate(signer crypto.Signer) (*x509.Certificate, error) {
+//
+// The subject and validity parameters are optional. If subject is nil, default values are used.
+// If validity is zero, [DefaultRootValidity] is used.
+func createRootCertificate(signer crypto.Signer, subject *pkix.Name, validity time.Duration) (*x509.Certificate, error) {
+	if subject == nil {
+		return nil, fmt.Errorf("subject is required for root certificate")
+	}
+
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
@@ -44,14 +51,18 @@ func createRootCertificate(signer crypto.Signer) (*x509.Certificate, error) {
 	}
 
 	now := time.Now()
+
+	// Set default validity if not provided
+	certValidity := DefaultRootValidity
+	if validity > 0 {
+		certValidity = validity
+	}
+
 	template := &x509.Certificate{
-		SerialNumber: serialNumber,
-		Subject: pkix.Name{
-			Organization: []string{"TPM Simulator Test CA"},
-			CommonName:   "TPM Simulator Root CA",
-		},
+		SerialNumber:          serialNumber,
+		Subject:               *subject,
 		NotBefore:             now.Add(-1 * time.Minute),
-		NotAfter:              now.Add(DefaultRootValidity),
+		NotAfter:              now.Add(certValidity),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 		BasicConstraintsValid: true,
 		IsCA:                  true,
@@ -73,7 +84,14 @@ func createRootCertificate(signer crypto.Signer) (*x509.Certificate, error) {
 }
 
 // createIntermediateCertificate creates an intermediate CA certificate signed by the root CA.
-func createIntermediateCertificate(rootCert *x509.Certificate, rootSigner crypto.Signer, intSigner crypto.Signer) (*x509.Certificate, error) {
+//
+// The subject and validity parameters are optional. If subject is nil, default values are used.
+// If validity is zero, [DefaultIntermediateValidity] is used.
+func createIntermediateCertificate(rootCert *x509.Certificate, rootSigner crypto.Signer, intSigner crypto.Signer, subject *pkix.Name, validity time.Duration) (*x509.Certificate, error) {
+	if subject == nil {
+		return nil, fmt.Errorf("subject is required for intermediate certificate")
+	}
+
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
@@ -81,14 +99,18 @@ func createIntermediateCertificate(rootCert *x509.Certificate, rootSigner crypto
 	}
 
 	now := time.Now()
+
+	// Set default validity if not provided
+	certValidity := DefaultIntermediateValidity
+	if validity > 0 {
+		certValidity = validity
+	}
+
 	template := &x509.Certificate{
-		SerialNumber: serialNumber,
-		Subject: pkix.Name{
-			Organization: []string{"TPM Simulator Test CA"},
-			CommonName:   "TPM Simulator Intermediate CA",
-		},
+		SerialNumber:          serialNumber,
+		Subject:               *subject,
 		NotBefore:             now.Add(-1 * time.Minute),
-		NotAfter:              now.Add(DefaultIntermediateValidity),
+		NotAfter:              now.Add(certValidity),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 		BasicConstraintsValid: true,
 		IsCA:                  true,

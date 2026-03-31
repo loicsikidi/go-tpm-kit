@@ -12,8 +12,8 @@ import (
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 
+	"github.com/loicsikidi/go-tpm-kit/tpmcert/ekca"
 	"github.com/loicsikidi/go-tpm-kit/tpmcert/x509ext"
-	"github.com/loicsikidi/go-tpm-kit/tpmtest/ekca"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 

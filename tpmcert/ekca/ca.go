@@ -18,6 +18,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/loicsikidi/go-tpm-kit/internal/utils"
 	"github.com/loicsikidi/go-tpm-kit/tpmcert/oid"
 	"github.com/loicsikidi/go-tpm-kit/tpmcert/x509ext"
 )
@@ -26,49 +27,191 @@ var ErrEKInvalidSAN = errors.New("subject alternative name must contain TPMManuf
 
 // CA represents a two-level certificate authority (Root + Intermediate).
 //
-// The CA is used to sign EK certificates for testing purposes.
+// The CA is used to sign EK certificates (essentially for testing or ready-to-use scenarios [eg. memory-based PKI]).
 // It follows the standard CA hierarchy with a self-signed root and
 // an intermediate CA signed by the root.
 type CA struct {
 	// Root is the self-signed root CA certificate.
 	Root *x509.Certificate
-	// RootSigner is the private key for the root CA.
-	RootSigner crypto.Signer
 	// Intermediate is the intermediate CA certificate signed by the root.
 	Intermediate *x509.Certificate
 	// IntSigner is the private key for the intermediate CA.
 	IntSigner crypto.Signer
 }
 
-// NewCA creates a new [CA] with Root + Intermediate structure.
-func NewCA() (*CA, error) {
-	// Generate root key pair
-	rootKey, err := generateECDSAKey()
-	if err != nil {
-		return nil, fmt.Errorf("generate root key: %w", err)
+// CertConfig defines configuration options for generating a CA certificate.
+type CertConfig struct {
+	// Subject for the certificate.
+	//
+	// Optional. If not provided, defaults will be used based on certificate type.
+	Subject *pkix.Name
+	// Validity is the duration for which the certificate is valid.
+	//
+	// Optional. If not provided, defaults will be used:
+	//   - Root: [DefaultRootValidity]
+	//   - Intermediate: [DefaultIntermediateValidity]
+	Validity time.Duration
+	// Certificate is an existing certificate to use instead of generating a new one.
+	//
+	// Optional. When provided, Signer must also be provided.
+	Certificate *x509.Certificate
+	// Signer is the private key for an existing certificate.
+	//
+	// Optional. When provided, Certificate must also be provided.
+	Signer crypto.Signer
+}
+
+// CheckAndSetDefault validates the configuration.
+func (c *CertConfig) CheckAndSetDefault() error {
+	if (c.Certificate != nil && c.Signer == nil) || (c.Certificate == nil && c.Signer != nil) {
+		return errors.New("invalid input: Certificate and Signer must both be provided or both be nil")
+	}
+	return nil
+}
+
+// hasExistingCert returns true if an existing certificate and signer are provided.
+func (c *CertConfig) hasExistingCert() bool {
+	return c != nil && c.Certificate != nil
+}
+
+// hasCustomConfig returns true if custom configuration (subject or validity) is provided.
+func (c *CertConfig) hasCustomConfig() bool {
+	return c != nil && (c.Subject != nil || c.Validity > 0)
+}
+
+// CAConfig defines configuration options for creating a [CA].
+type CAConfig struct {
+	// Root configuration for the root CA certificate.
+	//
+	// Optional.
+	Root *CertConfig
+	// Intermediate configuration for the intermediate CA certificate.
+	//
+	// Optional.
+	Intermediate *CertConfig
+}
+
+// CheckAndSetDefault validates and sets default values for the CA configuration.
+func (c *CAConfig) CheckAndSetDefault() error {
+	if c.Root != nil {
+		if err := c.Root.CheckAndSetDefault(); err != nil {
+			return fmt.Errorf("root config: %w", err)
+		}
+	}
+	if c.Intermediate != nil {
+		if err := c.Intermediate.CheckAndSetDefault(); err != nil {
+			return fmt.Errorf("intermediate config: %w", err)
+		}
 	}
 
-	// Create self-signed root certificate
-	rootCert, err := createRootCertificate(rootKey)
-	if err != nil {
-		return nil, fmt.Errorf("create root certificate: %w", err)
+	// If an existing intermediate certificate is provided, root must also be provided
+	if c.Intermediate.hasExistingCert() && !c.Root.hasExistingCert() {
+		return errors.New("root certificate must be provided when intermediate certificate is provided")
 	}
 
-	// Generate intermediate key pair
-	intKey, err := generateECDSAKey()
-	if err != nil {
-		return nil, fmt.Errorf("generate intermediate key: %w", err)
+	// If both certificates are provided, verify that intermediate is signed by root
+	if c.Root.hasExistingCert() && c.Intermediate.hasExistingCert() {
+		if err := c.Intermediate.Certificate.CheckSignatureFrom(c.Root.Certificate); err != nil {
+			return fmt.Errorf("intermediate certificate must be signed by root certificate: %w", err)
+		}
 	}
 
-	// Create intermediate certificate signed by root
-	intCert, err := createIntermediateCertificate(rootCert, rootKey, intKey)
-	if err != nil {
-		return nil, fmt.Errorf("create intermediate certificate: %w", err)
+	return nil
+}
+
+// New creates a new [CA] with Root + Intermediate structure.
+//
+// The optionalCfg parameter can be used to customize the CA certificates.
+// If not provided, default values are used for both root and intermediate certificates.
+//
+// Example:
+//
+//	// Default CA
+//	ca, err := ekca.New()
+//
+//	// Custom subject and validity
+//	ca, err := ekca.New(ekca.CAConfig{
+//	    Root: &ekca.CertConfig{
+//	        Subject: &pkix.Name{
+//	            Organization: []string{"My Org"},
+//	            CommonName:   "My Root CA",
+//	        },
+//	        Validity: 24 * time.Hour,
+//	    },
+//	})
+func New(optionalCfg ...CAConfig) (*CA, error) {
+	cfg := utils.OptionalArg(optionalCfg)
+	if err := cfg.CheckAndSetDefault(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
+	var rootCert *x509.Certificate
+	var rootKey crypto.Signer
+	var err error
+
+	// Use existing root certificate or create a new one
+	if cfg.Root.hasExistingCert() {
+		rootCert = cfg.Root.Certificate
+		rootKey = cfg.Root.Signer
+	} else {
+		rootKey, err = generateECDSAKey()
+		if err != nil {
+			return nil, fmt.Errorf("generate root key: %w", err)
+		}
+
+		// Set default subject if not provided
+		rootSubject := &pkix.Name{
+			Organization: []string{"go-tpm-kit"},
+			CommonName:   "TPM Simulator Root CA",
+		}
+		var rootValidity time.Duration
+		if cfg.Root.hasCustomConfig() {
+			if cfg.Root.Subject != nil {
+				rootSubject = cfg.Root.Subject
+			}
+			rootValidity = cfg.Root.Validity
+		}
+
+		rootCert, err = createRootCertificate(rootKey, rootSubject, rootValidity)
+		if err != nil {
+			return nil, fmt.Errorf("create root certificate: %w", err)
+		}
+	}
+
+	var intCert *x509.Certificate
+	var intKey crypto.Signer
+
+	// Use existing intermediate certificate or create a new one
+	if cfg.Intermediate.hasExistingCert() {
+		intCert = cfg.Intermediate.Certificate
+		intKey = cfg.Intermediate.Signer
+	} else {
+		intKey, err = generateECDSAKey()
+		if err != nil {
+			return nil, fmt.Errorf("generate intermediate key: %w", err)
+		}
+
+		// Set default subject if not provided
+		intSubject := &pkix.Name{
+			Organization: []string{"go-tpm-kit"},
+			CommonName:   "TPM Simulator Intermediate CA",
+		}
+		var intValidity time.Duration
+		if cfg.Intermediate.hasCustomConfig() {
+			if cfg.Intermediate.Subject != nil {
+				intSubject = cfg.Intermediate.Subject
+			}
+			intValidity = cfg.Intermediate.Validity
+		}
+
+		intCert, err = createIntermediateCertificate(rootCert, rootKey, intKey, intSubject, intValidity)
+		if err != nil {
+			return nil, fmt.Errorf("create intermediate certificate: %w", err)
+		}
 	}
 
 	return &CA{
 		Root:         rootCert,
-		RootSigner:   rootKey,
 		Intermediate: intCert,
 		IntSigner:    intKey,
 	}, nil
