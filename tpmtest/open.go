@@ -59,6 +59,17 @@ func GetEndorsementCA() (*ekca.CA, error) {
 	return caInstance, caErr
 }
 
+// MustGetEndorsementCA returns the singleton [ekca.CA] instance.
+//
+// This function panics if the CA cannot be created.
+func MustGetEndorsementCA() *ekca.CA {
+	ca, err := GetEndorsementCA()
+	if err != nil {
+		panic(err)
+	}
+	return ca
+}
+
 // OpenConfig configures the simulator initialization with EK certificates.
 type OpenConfig struct {
 	// EKCerts is the list of EK templates to provision with certificates.
@@ -70,6 +81,11 @@ type OpenConfig struct {
 	//
 	// Default: false.
 	SkipProvisioning bool
+	// SkipCleanup disables cleaning up the simulator on test completion.
+	// When true, the simulator is not closed automatically.
+	//
+	// Default: false.
+	SkipCleanup bool
 }
 
 // CheckAndSetDefault checks and sets default values for the open configuration.
@@ -85,7 +101,8 @@ func (c *OpenConfig) CheckAndSetDefault() error {
 //
 // The certificates are signed by a test CA accessible via [GetEndorsementCA].
 //
-// Note: the connection is automatically closed when the test completes.
+// Note: the connection is automatically closed when the test completes
+// unless [OpenConfig.SkipCleanup] is set to true.
 //
 // Example:
 //
@@ -110,16 +127,16 @@ func OpenSimulator(t *testing.T, optionalCfg ...OpenConfig) transport.TPM {
 	if err != nil {
 		t.Fatalf("could not connect to TPM simulator: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := tpm.Close(); err != nil {
-			t.Errorf("could not close TPM simulator: %v", err)
-		}
-	})
-
 	cfg := utils.OptionalArg(optionalCfg)
 	if !cfg.SkipProvisioning {
 		initSimu(t, tpm, cfg)
 	}
-
+	if !cfg.SkipCleanup {
+		t.Cleanup(func() {
+			if err := tpm.Close(); err != nil {
+				t.Errorf("could not close TPM simulator: %v", err)
+			}
+		})
+	}
 	return tpm
 }
