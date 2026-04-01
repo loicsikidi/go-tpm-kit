@@ -425,10 +425,10 @@ type LoadConfig struct {
 	//
 	// Required.
 	InPublic tpm2.TPM2BPublic
-	// Auth is the authorization session for the parent key.
+	// ParentAuth is the authorization session for the parent key.
 	//
 	// Default: [NoAuth].
-	Auth tpm2.Session
+	ParentAuth tpm2.Session
 }
 
 // CheckAndSetDefault validates and sets default values for LoadConfig.
@@ -439,8 +439,8 @@ func (c *LoadConfig) CheckAndSetDefault() error {
 	if len(c.InPrivate.Buffer) == 0 {
 		return fmt.Errorf("InPrivate is required")
 	}
-	if c.Auth == nil {
-		c.Auth = NoAuth
+	if c.ParentAuth == nil {
+		c.ParentAuth = NoAuth
 	}
 	return nil
 }
