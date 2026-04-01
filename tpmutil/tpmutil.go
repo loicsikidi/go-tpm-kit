@@ -1244,6 +1244,11 @@ func createCloser(t transport.TPM, handle tpm2.TPMHandle) func() error {
 	}
 }
 
+// CloseHandle flushes the given TPM handle.
+func CloseHandle(t transport.TPM, handle Handle) error {
+	return createCloser(t, handle.Handle())()
+}
+
 type publicArea struct {
 	public        *tpm2.TPMTPublic
 	Name          tpm2.TPM2BName
