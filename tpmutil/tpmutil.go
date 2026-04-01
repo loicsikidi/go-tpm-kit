@@ -971,7 +971,7 @@ func Load(t transport.TPM, optionalCfg ...LoadConfig) (HandleCloser, error) {
 	}
 
 	cmd := tpm2.Load{
-		ParentHandle: ToAuthHandle(cfg.ParentHandle, cfg.Auth),
+		ParentHandle: ToAuthHandle(cfg.ParentHandle, cfg.ParentAuth),
 		InPrivate:    cfg.InPrivate,
 		InPublic:     cfg.InPublic,
 	}
@@ -1032,7 +1032,7 @@ func Create(t transport.TPM, optionalCfg ...CreateConfig) (HandleCloser, error) 
 		ParentHandle: cfg.ParentHandle,
 		InPrivate:    result.OutPrivate,
 		InPublic:     result.OutPublic,
-		Auth:         cfg.ParentAuth,
+		ParentAuth:   cfg.ParentAuth,
 	})
 }
 

@@ -526,8 +526,8 @@ func TestLoadConfig_CheckAndSetDefault(t *testing.T) {
 			t.Fatalf("CheckAndSetDefault() failed: %v", err)
 		}
 
-		if cfg.Auth == nil {
-			t.Error("Expected Auth to be set to NoAuth")
+		if cfg.ParentAuth == nil {
+			t.Error("Expected ParentAuth to be set to NoAuth")
 		}
 	})
 
