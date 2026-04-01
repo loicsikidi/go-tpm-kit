@@ -605,12 +605,12 @@ func GetPersistedKeyHandle(t transport.TPM, optionalCfg ...GetPersistedKeyHandle
 	return hc, nil
 }
 
-// GetSKRHandle retrieves or creates the Storage Root Key (SRK) handle based on the provided configuration.
+// GetSRKHandle retrieves or creates the Storage Root Key (SRK) handle based on the provided configuration.
 //
 // Example:
 //
 //	// Get or create an ECC SRK at the default persistent handle
-//	srkHandle, err := tpmutil.GetSKRHandle(tpm, &tpmutil.ParentConfig{
+//	srkHandle, err := tpmutil.GetSRKHandle(tpm, &tpmutil.ParentConfig{
 //		KeyType:   tpmutil.ECC,
 //		Hierarchy: tpm2.TPMRHOwner,
 //	})
@@ -620,7 +620,7 @@ func GetPersistedKeyHandle(t transport.TPM, optionalCfg ...GetPersistedKeyHandle
 //	fmt.Printf("SRK handle: 0x%x\n", srkHandle.Handle())
 //
 // Note: If cfg is nil, default configuration is used.
-func GetSKRHandle(t transport.TPM, optionalCfg ...ParentConfig) (Handle, error) {
+func GetSRKHandle(t transport.TPM, optionalCfg ...ParentConfig) (Handle, error) {
 	cfg := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, err
@@ -670,7 +670,7 @@ func GetSKRHandle(t transport.TPM, optionalCfg ...ParentConfig) (Handle, error) 
 }
 
 // GetEKHandle retrieves the Endorsement Key (EK) handle from the TPM.
-// Unlike [GetSKRHandle], this function does not create the EK if it doesn't exist.
+// Unlike [GetSRKHandle], this function does not create the EK if it doesn't exist.
 //
 // Example:
 //

@@ -531,7 +531,7 @@ func TestNewAKTemplate(t *testing.T) {
 	thetpm := testutil.OpenSimulator(t)
 
 	// Create SRK first
-	srkHandle, err := tpmutil.GetSKRHandle(thetpm, tpmutil.ParentConfig{})
+	srkHandle, err := tpmutil.GetSRKHandle(thetpm, tpmutil.ParentConfig{})
 	if err != nil {
 		t.Fatalf("failed to get SRK handle: %v", err)
 	}
@@ -765,7 +765,7 @@ func TestNewApplicationKeyTemplate(t *testing.T) {
 	thetpm := testutil.OpenSimulator(t)
 
 	// Create SRK first
-	srkHandle, err := tpmutil.GetSKRHandle(thetpm, tpmutil.ParentConfig{})
+	srkHandle, err := tpmutil.GetSRKHandle(thetpm, tpmutil.ParentConfig{})
 	if err != nil {
 		t.Fatalf("failed to get SRK handle: %v", err)
 	}

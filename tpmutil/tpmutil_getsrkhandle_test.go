@@ -20,7 +20,7 @@ func TestGetSKRHandle_CreateNew_RSA(t *testing.T) {
 	cfg := tpmutil.ParentConfig{
 		KeyFamily: tpmutil.RSA,
 	}
-	srkHandle, err := tpmutil.GetSKRHandle(thetpm, cfg)
+	srkHandle, err := tpmutil.GetSRKHandle(thetpm, cfg)
 	if err != nil {
 		t.Fatalf("GetSKRHandle() failed: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestGetSKRHandle_CreateNew_ECC(t *testing.T) {
 	cfg := tpmutil.ParentConfig{
 		KeyFamily: tpmutil.ECC,
 	}
-	srkHandle, err := tpmutil.GetSKRHandle(thetpm, cfg)
+	srkHandle, err := tpmutil.GetSRKHandle(thetpm, cfg)
 	if err != nil {
 		t.Fatalf("GetSKRHandle() failed: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestGetSKRHandle_AlreadyPersisted_SKR(t *testing.T) {
 	cfg := tpmutil.ParentConfig{
 		KeyFamily: tpmutil.RSA,
 	}
-	_, err := tpmutil.GetSKRHandle(thetpm, cfg)
+	_, err := tpmutil.GetSRKHandle(thetpm, cfg)
 	if err != nil {
 		t.Fatalf("Initial GetSKRHandle() failed: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestGetSKRHandle_AlreadyPersisted_SKR(t *testing.T) {
 	cfg2 := tpmutil.ParentConfig{
 		KeyFamily: tpmutil.ECC,
 	}
-	srkHandle, err := tpmutil.GetSKRHandle(thetpm, cfg2)
+	srkHandle, err := tpmutil.GetSRKHandle(thetpm, cfg2)
 	if err != nil {
 		t.Fatalf("Second GetSKRHandle() failed: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestGetSKRHandle_CustomOwnerPassword(t *testing.T) {
 		KeyFamily: tpmutil.ECC,
 		Auth:      tpm2.PasswordAuth(ownerPassword),
 	}
-	srkHandle, err := tpmutil.GetSKRHandle(thetpm, cfg)
+	srkHandle, err := tpmutil.GetSRKHandle(thetpm, cfg)
 	if err != nil {
 		t.Fatalf("GetSKRHandle() with custom password failed: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestGetSKRHandle_NonStandardHandle(t *testing.T) {
 		KeyFamily: tpmutil.ECC,
 		Handle:    tpmutil.NewHandle(customHandle),
 	}
-	srkHandle, err := tpmutil.GetSKRHandle(thetpm, cfg)
+	srkHandle, err := tpmutil.GetSRKHandle(thetpm, cfg)
 	if err != nil {
 		t.Fatalf("GetSKRHandle() with custom handle failed: %v", err)
 	}
