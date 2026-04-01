@@ -212,9 +212,11 @@ type ParentConfig struct {
 	//
 	// Default: [tpmkit.SRKHandle].
 	Handle Handle
-	// KeyFamily is the type of the key to be created under the parent.
+	// KeyFamily is the parent's  key type (i.e. RSA or ECC).
 	//
-	// Default: [ECC] (to save key generation time).
+	// The template used for key creation will be based on this value.
+	//
+	// Default: [ECC] (to save latency during key generation).
 	KeyFamily KeyFamily
 	// Hierarchy specifies which TPM hierarchy to use.
 	//
