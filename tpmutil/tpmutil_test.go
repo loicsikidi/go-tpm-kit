@@ -1120,3 +1120,72 @@ func TestHmacValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestCloseHandle(t *testing.T) {
+	thetpm := testutil.OpenSimulator(t)
+
+	t.Run("transient handle should be flushed", func(t *testing.T) {
+		createPrimary := tpm2.CreatePrimary{
+			PrimaryHandle: tpm2.TPMRHOwner,
+			InPublic:      tpm2.New2B(tpm2.ECCSRKTemplate),
+		}
+
+		rsp, err := createPrimary.Execute(thetpm)
+		if err != nil {
+			t.Fatalf("CreatePrimary() failed: %v", err)
+		}
+
+		handle := tpmutil.NewHandle(&rsp.ObjectHandle)
+
+		if handle.Type() != tpmutil.TransientHandle {
+			t.Fatalf("Expected TransientHandle, got %v", handle.Type())
+		}
+
+		if err := tpmutil.CloseHandle(thetpm, handle); err != nil {
+			t.Errorf("CloseHandle() failed: %v", err)
+		}
+
+		_, err = tpm2.ReadPublic{
+			ObjectHandle: rsp.ObjectHandle,
+		}.Execute(thetpm)
+		if err == nil {
+			t.Error("Expected error when reading flushed handle, got nil")
+		}
+	})
+
+	t.Run("persistent handle should not be flushed", func(t *testing.T) {
+		persistHandle, err := tpmutil.GetSRKHandle(thetpm, tpmutil.ParentConfig{
+			KeyFamily: tpmutil.ECC,
+		})
+		if err != nil {
+			t.Fatalf("GetSRKHandle() failed: %v", err)
+		}
+
+		if err := tpmutil.CloseHandle(thetpm, persistHandle); err != nil {
+			t.Errorf("CloseHandle() failed: %v", err)
+		}
+
+		_, err = tpm2.ReadPublic{
+			ObjectHandle: persistHandle,
+		}.Execute(thetpm)
+		if err != nil {
+			t.Errorf("Expected persistent handle to still exist, got error: %v", err)
+		}
+	})
+
+	t.Run("permanent handle should not be flushed", func(t *testing.T) {
+		handle := tpmutil.NewHandle(&tpm2.AuthHandle{
+			Handle: tpm2.TPMRHOwner,
+			Name:   tpm2.HandleName(tpm2.TPMRHOwner),
+		})
+
+		if handle.Type() != tpmutil.PermanentHandle {
+			t.Fatalf("Expected PermanentHandle, got %v", handle.Type())
+		}
+
+		err := tpmutil.CloseHandle(thetpm, handle)
+		if err != nil {
+			t.Errorf("CloseHandle() failed: %v", err)
+		}
+	})
+}

@@ -624,6 +624,15 @@ type PersistConfig struct {
 	//
 	// Default: false
 	Force bool
+	// SkipFlush indicates whether to skip flushing the transient handle
+	// after persisting it. When true, the transient handle remains loaded
+	// in the TPM after the persist operation completes.
+	//
+	// Important: If true, the caller is responsible for eventually flushing
+	// the transient handle in order to avoid memory leaks.
+	//
+	// Default: false
+	SkipFlush bool
 }
 
 func (c *PersistConfig) CheckAndSetDefault() error {
