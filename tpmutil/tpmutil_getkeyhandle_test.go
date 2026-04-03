@@ -6,11 +6,14 @@
 package tpmutil_test
 
 import (
+	"crypto"
+	"crypto/ecdsa"
 	"errors"
 	"testing"
 
 	"github.com/google/go-tpm/tpm2"
 	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
+	"github.com/loicsikidi/go-tpm-kit/tpmcrypto"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 )
 
@@ -99,6 +102,69 @@ func TestGetKeyHandle_AlreadyPersisted(t *testing.T) {
 				t.Errorf("expected %v key type, got %v", tt.expectedType, handle.Public().Type)
 			}
 		})
+	}
+}
+
+func TestGetKeyHandle_OrdinaryKey(t *testing.T) {
+	thetpm := testutil.OpenSimulator(t)
+
+	srkHandle, err := tpmutil.GetSRKHandle(thetpm)
+	if err != nil {
+		t.Fatalf("GetSRKHandle failed: %v", err)
+	}
+
+	appKeyTemplate := tpmutil.MustApplicationKeyTemplate()
+	childHandle, err := tpmutil.Create(thetpm, tpmutil.CreateConfig{
+		ParentHandle: srkHandle,
+		InPublic:     appKeyTemplate,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	persistentHandle := tpmutil.NewHandle(tpm2.TPMHandle(0x81000020))
+	_, err = tpmutil.Persist(thetpm, tpmutil.PersistConfig{
+		TransientHandle:  childHandle,
+		PersistentHandle: persistentHandle,
+	})
+	if err != nil {
+		t.Fatalf("Persist failed: %v", err)
+	}
+
+	handle, err := tpmutil.GetPersistedKeyHandle(thetpm, tpmutil.GetPersistedKeyHandleConfig{
+		Handle: persistentHandle,
+	})
+	if err != nil {
+		t.Fatalf("GetPersistedKeyHandle failed: %v", err)
+	}
+
+	// Ensure the key can be used for signing
+	msg := []byte("test message")
+	result, err := tpmutil.Hash(thetpm, tpmutil.HashConfig{
+		Hierarchy: tpm2.TPMRHOwner,
+		HashAlg:   crypto.SHA256,
+		Data:      msg,
+	})
+	if err != nil {
+		t.Fatalf("Hash failed: %v", err)
+	}
+
+	signature, err := tpmutil.Sign(thetpm, tpmutil.SignConfig{
+		KeyHandle:  handle,
+		Validation: result.Validation,
+		SignerOpts: crypto.SHA256,
+		Digest:     result.Digest,
+	})
+	if err != nil {
+		t.Fatalf("Sign failed: %v", err)
+	}
+
+	pubKey, err := tpmcrypto.PublicKey(handle.Public())
+	if err != nil {
+		t.Fatalf("PublicKey() failed: %v", err)
+	}
+	if !ecdsa.VerifyASN1(pubKey.(*ecdsa.PublicKey), result.Digest, signature) {
+		t.Error("signature verification failed")
 	}
 }
 
