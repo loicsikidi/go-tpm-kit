@@ -189,10 +189,15 @@ func (h *tpmHandle) Close() error {
 	if h.tpm == nil {
 		return ErrMissingTpm
 	}
-	_, err := tpm2.FlushContext{
-		FlushHandle: h.handle,
-	}.Execute(h.tpm)
-	return err
+
+	// Flush the handle if it is a transient handle.
+	if h.Type() == TransientHandle {
+		_, err := tpm2.FlushContext{
+			FlushHandle: h.handle,
+		}.Execute(h.tpm)
+		return err
+	}
+	return nil
 }
 
 func (h *tpmHandle) toAuthHandle() tpm2.AuthHandle {

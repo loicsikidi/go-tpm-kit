@@ -856,6 +856,12 @@ func Persist(t transport.TPM, optionalCfg ...PersistConfig) (Handle, error) {
 		return nil, fmt.Errorf("EvictControl failed: %w", err)
 	}
 
+	if !cfg.SkipFlush {
+		if err := CloseHandle(t, cfg.TransientHandle); err != nil {
+			return nil, fmt.Errorf("failed to close transient handle: %w", err)
+		}
+	}
+
 	// Return the persistent handle
 	persistedHandle := NewHandle(&tpm2.NamedHandle{
 		Handle: cfg.PersistentHandle.Handle(),
@@ -1246,7 +1252,12 @@ func createCloser(t transport.TPM, handle tpm2.TPMHandle) func() error {
 
 // CloseHandle flushes the given TPM handle.
 func CloseHandle(t transport.TPM, handle Handle) error {
-	return createCloser(t, handle.Handle())()
+	// Only transient handle needs to be flushed.
+	if handle.Type() == TransientHandle {
+		closer := createCloser(t, handle.Handle())
+		return closer()
+	}
+	return nil
 }
 
 type publicArea struct {
