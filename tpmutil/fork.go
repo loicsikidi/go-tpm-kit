@@ -18,12 +18,12 @@ var (
 		tpm2.TPMAlgSHA512: policyASHA512,
 		tpm2.TPMAlgSM3256: policyASM3256,
 	}
-	policyB = map[tpm2.TPMIAlgHash][]byte{
-		tpm2.TPMAlgSHA256: policyBSHA256,
-		tpm2.TPMAlgSHA384: policyBSHA384,
-		tpm2.TPMAlgSHA512: policyBSHA512,
-		tpm2.TPMAlgSM3256: policyBSM3256,
-	}
+	// policyB = map[tpm2.TPMIAlgHash][]byte{
+	// 	tpm2.TPMAlgSHA256: policyBSHA256,
+	// 	tpm2.TPMAlgSHA384: policyBSHA384,
+	// 	tpm2.TPMAlgSHA512: policyBSHA512,
+	// 	tpm2.TPMAlgSM3256: policyBSM3256,
+	// }
 	policyC = map[tpm2.TPMIAlgHash][]byte{
 		tpm2.TPMAlgSHA256: policyCSHA256,
 		tpm2.TPMAlgSHA384: policyCSHA384,
@@ -32,22 +32,22 @@ var (
 	}
 )
 
-// AuthPolicyA is a policy satisfied by proving knowledge of the Endorsement
+// authPolicyA is a policy satisfied by proving knowledge of the Endorsement
 // Hierarchy password.
 //
 // This is done by executing [PolicySecret] with [TPMRHEndorsement]. See the
 // "Satisfying PolicyA" section of the EK Credential Profile for more info.
 //
 // This is the [TPMTPublic.AuthPolicy] for all Low Range templates.
-func AuthPolicyA(hashAlg tpm2.TPMIAlgHash) (tpm2.TPM2BDigest, error) {
+func authPolicyA(hashAlg tpm2.TPMIAlgHash) (tpm2.TPM2BDigest, error) {
 	if policy, ok := policyA[hashAlg]; ok {
 		return tpm2.TPM2BDigest{Buffer: bytes.Clone(policy)}, nil
 	}
 	return tpm2.TPM2BDigest{}, fmt.Errorf("no PolicyA for hash alg 0x%x", hashAlg)
 }
 
-// AuthPolicyB is a policy satisfied by satisfying [AuthPolicyA] or
-// [AuthPolicyC].
+// authPolicyB is a policy satisfied by satisfying [authPolicyA] or
+// [authPolicyC].
 //
 // This is done by:
 //   - First, satifying either of the two policies.
@@ -56,19 +56,19 @@ func AuthPolicyA(hashAlg tpm2.TPMIAlgHash) (tpm2.TPM2BDigest, error) {
 // See the "Satisfying PolicyB" section of the EK Credential Profile for more info.
 //
 // This is the [TPMTPublic.AuthPolicy] for all High Range templates.
-func AuthPolicyB(hashAlg tpm2.TPMIAlgHash) (tpm2.TPM2BDigest, error) {
-	if policy, ok := policyB[hashAlg]; ok {
-		return tpm2.TPM2BDigest{Buffer: bytes.Clone(policy)}, nil
-	}
-	return tpm2.TPM2BDigest{}, fmt.Errorf("no PolicyB for hash alg 0x%x", hashAlg)
-}
+// func authPolicyB(hashAlg tpm2.TPMIAlgHash) (tpm2.TPM2BDigest, error) {
+// 	if policy, ok := policyB[hashAlg]; ok {
+// 		return tpm2.TPM2BDigest{Buffer: bytes.Clone(policy)}, nil
+// 	}
+// 	return tpm2.TPM2BDigest{}, fmt.Errorf("no PolicyB for hash alg 0x%x", hashAlg)
+// }
 
-// AuthPolicyC is a policy satisfied by satisfying the policy stored at
+// authPolicyC is a policy satisfied by satisfying the policy stored at
 // [AuthPolicyNVPublic].
 //
 // This is done by executing [PolicyAuthorizeNV] with the [TPMSNVPublic.NVIndex]
 // of [AuthPolicyNVPublic].
-func AuthPolicyC(hashAlg tpm2.TPMIAlgHash) (tpm2.TPM2BDigest, error) {
+func authPolicyC(hashAlg tpm2.TPMIAlgHash) (tpm2.TPM2BDigest, error) {
 	if policy, ok := policyC[hashAlg]; ok {
 		return tpm2.TPM2BDigest{Buffer: bytes.Clone(policy)}, nil
 	}

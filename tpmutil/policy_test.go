@@ -28,7 +28,7 @@ func TestEkPolicyCallback(t *testing.T) {
 	}()
 
 	// Use EkPolicy to satisfy the policy
-	err = tpmutil.EkPolicyCallback(thetpm, sess.Handle(), tpm2.TPM2BNonce{})
+	err = tpmutil.EkPolicyACallback(thetpm, sess.Handle(), tpm2.TPM2BNonce{})
 	if err != nil {
 		t.Fatalf("EkPolicy() failed: %v", err)
 	}
