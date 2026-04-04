@@ -80,6 +80,13 @@ type Handle interface {
 	Type() HandleType
 }
 
+// HandlePublicGetter extends Handle with the ability to access
+// the public area of a key.
+type HandlePublicGetter interface {
+	Handle
+	PublicGetter
+}
+
 // HandleCloser extends Handle with the ability to release resources.
 // When a HandleCloser is no longer needed, calling Close() will flush the handle
 //
@@ -88,8 +95,7 @@ type Handle interface {
 // difficulty to implement this interface, because [HandleCloser] ensures to
 // have access to a TPM transport.
 type HandleCloser interface {
-	Handle
-	PublicGetter
+	HandlePublicGetter
 	io.Closer
 }
 
