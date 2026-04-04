@@ -397,6 +397,44 @@ func GetSigSchemeAndHashFromPublic(public tpm2.TPMTPublic) (scheme, hash tpm2.TP
 	return scheme, hash, nil
 }
 
+// GetSigHashFromPublicKey extracts the hash algorithm used for signing from a [crypto.PublicKey].
+//
+// Example:
+//
+//	hash, err := tpmcrypto.GetSigHashFromPublicKey(publicKey)
+func GetSigHashFromPublicKey(pub crypto.PublicKey) (crypto.Hash, error) {
+	switch p := pub.(type) {
+	case *rsa.PublicKey:
+		// Determine hash based on RSA key size
+		keyBits := p.Size() * 8
+		switch keyBits {
+		case 2048:
+			return crypto.SHA256, nil
+		case 3072:
+			return crypto.SHA384, nil
+		case 4096:
+			return crypto.SHA512, nil
+		default:
+			return 0, fmt.Errorf("unsupported RSA key size: %d bits", keyBits)
+		}
+	case *ecdsa.PublicKey:
+		// Determine hash based on curve
+		curveName := p.Curve.Params().Name
+		switch curveName {
+		case "P-256":
+			return crypto.SHA256, nil
+		case "P-384":
+			return crypto.SHA384, nil
+		case "P-521":
+			return crypto.SHA512, nil
+		default:
+			return 0, fmt.Errorf("unsupported ECC curve: %s", curveName)
+		}
+	default:
+		return 0, fmt.Errorf("unsupported public key type: %T", pub)
+	}
+}
+
 func getSigSchemeFromRSA(alg tpm2.TPMAlgID, opts crypto.SignerOpts) tpm2.TPMTSigScheme {
 	var scheme tpm2.TPMAlgID
 	if _, ok := opts.(*rsa.PSSOptions); ok {

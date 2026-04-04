@@ -525,6 +525,118 @@ func TestGetSigHashFromPublic(t *testing.T) {
 	}
 }
 
+func TestGetSigHashFromPublicKey(t *testing.T) {
+	tests := []struct {
+		name     string
+		genKey   func() (crypto.PublicKey, error)
+		wantHash crypto.Hash
+		wantErr  bool
+	}{
+		{
+			name: "RSA 2048",
+			genKey: func() (crypto.PublicKey, error) {
+				key, err := rsa.GenerateKey(rand.Reader, 2048)
+				if err != nil {
+					return nil, err
+				}
+				return &key.PublicKey, nil
+			},
+			wantHash: crypto.SHA256,
+			wantErr:  false,
+		},
+		{
+			name: "RSA 3072",
+			genKey: func() (crypto.PublicKey, error) {
+				key, err := rsa.GenerateKey(rand.Reader, 3072)
+				if err != nil {
+					return nil, err
+				}
+				return &key.PublicKey, nil
+			},
+			wantHash: crypto.SHA384,
+			wantErr:  false,
+		},
+		{
+			name: "RSA 4096",
+			genKey: func() (crypto.PublicKey, error) {
+				key, err := rsa.GenerateKey(rand.Reader, 4096)
+				if err != nil {
+					return nil, err
+				}
+				return &key.PublicKey, nil
+			},
+			wantHash: crypto.SHA512,
+			wantErr:  false,
+		},
+		{
+			name: "ECDSA P-256",
+			genKey: func() (crypto.PublicKey, error) {
+				key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+				if err != nil {
+					return nil, err
+				}
+				return &key.PublicKey, nil
+			},
+			wantHash: crypto.SHA256,
+			wantErr:  false,
+		},
+		{
+			name: "ECDSA P-384",
+			genKey: func() (crypto.PublicKey, error) {
+				key, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+				if err != nil {
+					return nil, err
+				}
+				return &key.PublicKey, nil
+			},
+			wantHash: crypto.SHA384,
+			wantErr:  false,
+		},
+		{
+			name: "ECDSA P-521",
+			genKey: func() (crypto.PublicKey, error) {
+				key, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+				if err != nil {
+					return nil, err
+				}
+				return &key.PublicKey, nil
+			},
+			wantHash: crypto.SHA512,
+			wantErr:  false,
+		},
+		{
+			name: "RSA 1024 - unsupported",
+			genKey: func() (crypto.PublicKey, error) {
+				key, err := rsa.GenerateKey(rand.Reader, 1024)
+				if err != nil {
+					return nil, err
+				}
+				return &key.PublicKey, nil
+			},
+			wantHash: 0,
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pub, err := tt.genKey()
+			if err != nil {
+				t.Fatalf("failed to generate key: %v", err)
+			}
+
+			hash, err := GetSigHashFromPublicKey(pub)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetSigHashFromPublicKey() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if hash != tt.wantHash {
+				t.Errorf("GetSigHashFromPublicKey() hash = %v, want %v", hash, tt.wantHash)
+			}
+		})
+	}
+}
+
 func TestGetSigSchemeAndHashFromPublic(t *testing.T) {
 	tests := []struct {
 		name       string
