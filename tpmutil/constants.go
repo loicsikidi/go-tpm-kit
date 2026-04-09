@@ -181,6 +181,13 @@ var (
 	ECCEKHandle tpm2.TPMHandle = 0x81010002
 )
 
+// ReservedHandles contains all TPM handles that are reserved by the TCG specifications.
+var ReservedHandles = []tpm2.TPMHandle{
+	SRKHandle,
+	RSAEKHandle,
+	ECCEKHandle,
+}
+
 // Predefined templates (public area) from TCG specifications.
 var (
 	// RSASRKTemplate contains the TCG reference RSA-2048 SRK template.
