@@ -109,9 +109,9 @@ import (
 
 The root module is imported with the alias `tpmkit`.
 
-### 1.5 The `CheckAndSetDefault()` Pattern
+### 1.5 The `CheckAndSetDefaults()` Pattern
 
-Every configuration struct implements a `CheckAndSetDefault() error` method that:
+Every configuration struct implements a `CheckAndSetDefaults() error` method that:
 
 1. **Validates** required fields (returns error if missing)
 2. **Sets defaults** for optional fields (mutates the receiver)
@@ -125,7 +125,7 @@ type HashConfig struct {
     Data      []byte         // Required
 }
 
-func (c *HashConfig) CheckAndSetDefault() error {
+func (c *HashConfig) CheckAndSetDefaults() error {
     if c.BlockSize < 0 {
         return ErrInvalidBlockSize
     }
@@ -145,7 +145,7 @@ func (c *HashConfig) CheckAndSetDefault() error {
 }
 ```
 
-**Ordering within `CheckAndSetDefault()`**: There is no strict ordering, but the general pattern is:
+**Ordering within `CheckAndSetDefaults()`**: There is no strict ordering, but the general pattern is:
 - Validate hard constraints first (negative values, invalid types)
 - Set defaults for zero-valued optional fields
 - Validate required fields last
@@ -157,7 +157,7 @@ Public API functions accept optional config structs as variadic arguments. The h
 ```go
 func NVRead(t transport.TPM, optionalCfg ...NVReadConfig) ([]byte, error) {
     cfg := utils.OptionalArg(optionalCfg)
-    if err := cfg.CheckAndSetDefault(); err != nil {
+    if err := cfg.CheckAndSetDefaults(); err != nil {
         return nil, err
     }
     return nvRead(t, cfg.Hierarchy, cfg.Index, cfg.Auth, cfg.BlockSize, cfg.MultiIndex)
@@ -178,7 +178,7 @@ This is **not** the functional options pattern. It uses concrete config structs.
 
 ### 1.8 Public vs. Private API
 
-- **Public**: Exported functions handle config validation (`CheckAndSetDefault()`) and are the entry points for users.
+- **Public**: Exported functions handle config validation (`CheckAndSetDefaults()`) and are the entry points for users.
 - **Private**: Unexported functions implement the actual logic. They receive already-validated, concrete parameters (not config structs).
 
 ```go
@@ -340,7 +340,7 @@ func TestNVReadConfigValidation(t *testing.T) {
 
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
-            err := tt.cfg.CheckAndSetDefault()
+            err := tt.cfg.CheckAndSetDefaults()
             if tt.wantErr != nil {
                 if err == nil {
                     t.Errorf("expected error %v, got nil", tt.wantErr)
@@ -431,7 +431,7 @@ const (
 | File | Content |
 |------|---------|
 | `tpmutil.go` | Main operations: `NVRead`, `NVWrite`, `Hash`, `Hmac`, `Sign`, `SymEncryptDecrypt`, `GenerateRnd`, `GetSKRHandle`, `GetEKHandle`, `CreatePrimary`, `Create`, `Load`, `Persist`, `PersistEK` |
-| `config.go` | All `*Config` structs with `CheckAndSetDefault()` |
+| `config.go` | All `*Config` structs with `CheckAndSetDefaults()` |
 | `errors.go` | Sentinel errors and custom error types |
 | `handle.go` | `Handle`, `HandleCloser` interfaces and `tpmHandle` implementation |
 | `key.go` | `KeyFamily`, `KeyType` enums, key template generators (`NewApplicationKeyTemplate`, `NewAKTemplate`) |
@@ -444,7 +444,7 @@ const (
 
 All operations use dedicated config structs: `HashConfig`, `SignConfig`, `NVReadConfig`, `NVWriteConfig`, `ParentConfig`, `EKParentConfig`, `CreatePrimaryConfig`, `CreateConfig`, `LoadConfig`, `SymEncryptDecryptConfig`, `HmacConfig`, `KeyConfig`, `PersistConfig`.
 
-Each follows the `CheckAndSetDefault()` pattern (see [1.5](#15-the-checkandsetdefault-pattern)).
+Each follows the `CheckAndSetDefaults()` pattern (see [1.5](#15-the-checkandsetdefault-pattern)).
 
 ### 2.3 Handle Abstraction
 
@@ -482,7 +482,7 @@ TCG-compliant key templates are defined as package-level variables with spec ref
 
 ### 3.2 Specific Conventions
 
-- **No `CheckAndSetDefault()` pattern**: This is a stateless utility package. Functions validate their inputs inline.
+- **No `CheckAndSetDefaults()` pattern**: This is a stateless utility package. Functions validate their inputs inline.
 - **No config structs**: Functions take direct parameters.
 - **No internal sub-packages**: Everything in a single file.
 
@@ -582,7 +582,7 @@ The default prompts via stdin. Tests override this with `PromptAuthValue.Store(.
 
 #### Name-Based Validation
 
-`SessionKey.CheckAndSetDefault()` validates that the TPM Name cryptographically matches the Public area (for salted sessions), preventing man-in-the-middle attacks.
+`SessionKey.CheckAndSetDefaults()` validates that the TPM Name cryptographically matches the Public area (for salted sessions), preventing man-in-the-middle attacks.
 
 ---
 
@@ -642,14 +642,14 @@ The default prompts via stdin. Tests override this with `PromptAuthValue.Store(.
 
 When adding a new TPM operation to `tpmutil`, follow this checklist:
 
-1. **Define a config struct** in `config.go` with a `CheckAndSetDefault() error` method
+1. **Define a config struct** in `config.go` with a `CheckAndSetDefaults() error` method
 2. **Document each field** with godoc, noting defaults with `Default:` and required fields with `Required.`
 3. **Use doc links** (`[TypeName]`) for cross-references to other types
 4. **Add sentinel errors** to `errors.go` if new validation failures are introduced
 5. **Create the public function** in `tpmutil.go` that:
    - Accepts `transport.TPM` as the first parameter
    - Accepts the config struct as a variadic parameter
-   - Calls `utils.OptionalArg()` + `cfg.CheckAndSetDefault()`
+   - Calls `utils.OptionalArg()` + `cfg.CheckAndSetDefaults()`
    - Delegates to an unexported implementation function
 6. **Create the private function** that receives validated, concrete parameters
 7. **Write tests** in a `tpmutil_<function>_test.go` file using:

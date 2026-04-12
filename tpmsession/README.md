@@ -453,7 +453,7 @@ key := &tpmsession.SessionKey{
 }
 
 // Validate before use
-if err := key.CheckAndSetDefault(); err != nil {
+if err := key.CheckAndSetDefaults(); err != nil {
     log.Fatal(err)
 }
 

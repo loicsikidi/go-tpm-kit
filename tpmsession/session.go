@@ -93,7 +93,7 @@ type AuditConfig struct {
 }
 
 // CheckAndSetDefault validates and sets default values for AuditConfig.
-func (ac *AuditConfig) CheckAndSetDefault() error {
+func (ac *AuditConfig) CheckAndSetDefaults() error {
 	if ac.AKHandle == nil {
 		return errors.New("AKHandle cannot be nil")
 	}
@@ -179,7 +179,7 @@ type SessionManager struct {
 //	// Use SHA384 with AES-192 for stronger security
 //	session := sm.WithHashAlg(crypto.SHA384).GetSession()
 func NewSessionManager(tpm transport.TPM, key *SessionKey) (*SessionManager, error) {
-	if err := key.CheckAndSetDefault(); err != nil {
+	if err := key.CheckAndSetDefaults(); err != nil {
 		return nil, fmt.Errorf("invalid session key: %w", err)
 	}
 
@@ -458,7 +458,7 @@ func (sm *SessionManager) StartAuditSession(config *AuditConfig) error {
 	}
 
 	// Validate and set defaults
-	if err := config.CheckAndSetDefault(); err != nil {
+	if err := config.CheckAndSetDefaults(); err != nil {
 		return fmt.Errorf("invalid audit config: %w", err)
 	}
 

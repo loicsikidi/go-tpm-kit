@@ -112,9 +112,9 @@ func TestSessionKey_CheckAndSetDefault(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.key.CheckAndSetDefault()
+			err := tt.key.CheckAndSetDefaults()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("CheckAndSetDefault() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("CheckAndSetDefaults() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -168,7 +168,7 @@ func TestSessionKey_Serialization(t *testing.T) {
 		}
 
 		// Validate after deserialization
-		if err := restored.CheckAndSetDefault(); err != nil {
+		if err := restored.CheckAndSetDefaults(); err != nil {
 			t.Fatalf("CheckAndSetDefault after unmarshal failed: %v", err)
 		}
 
@@ -230,7 +230,7 @@ func TestSessionKey_Serialization(t *testing.T) {
 		}
 
 		// Validate after deserialization
-		if err := restored.CheckAndSetDefault(); err != nil {
+		if err := restored.CheckAndSetDefaults(); err != nil {
 			t.Fatalf("CheckAndSetDefault after unmarshal failed: %v", err)
 		}
 

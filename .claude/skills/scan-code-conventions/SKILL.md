@@ -31,7 +31,7 @@ For each package, verify the presence/absence of these documented patterns:
 |---------|---------------|
 | License header | First 4 lines of every `.go` file |
 | Import grouping | 3-group separation (stdlib / external / internal) |
-| `CheckAndSetDefault()` | All config structs have this method |
+| `CheckAndSetDefaults()` | All config structs have this method |
 | Variadic optional config | Public functions using `utils.OptionalArg()` |
 | Public/private split | Exported func delegates to unexported impl |
 | Sentinel errors | `var ( Err... = errors.New(...) )` blocks |

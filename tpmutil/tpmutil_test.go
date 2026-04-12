@@ -241,7 +241,7 @@ func TestNVWriteMaxIndicesValidation(t *testing.T) {
 			}
 
 			// Test validation in CheckAndSetDefault
-			err := cfg.CheckAndSetDefault()
+			err := cfg.CheckAndSetDefaults()
 			if tt.wantErr != nil {
 				if err == nil {
 					t.Errorf("CheckAndSetDefault: expected error %v, got nil", tt.wantErr)
