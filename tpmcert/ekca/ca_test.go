@@ -364,7 +364,7 @@ func TestCertConfig_Validation(t *testing.T) {
 			cfg: ekca.CertConfig{
 				Signer: &ecdsa.PrivateKey{},
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "valid certificate and signer",

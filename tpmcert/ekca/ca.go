@@ -35,6 +35,8 @@ type CA struct {
 	Root *x509.Certificate
 	// Intermediate is the intermediate CA certificate signed by the root.
 	Intermediate *x509.Certificate
+	// RootSigner is the private key for the root CA.
+	RootSigner crypto.Signer
 	// IntSigner is the private key for the intermediate CA.
 	IntSigner crypto.Signer
 }
@@ -55,16 +57,24 @@ type CertConfig struct {
 	//
 	// Optional. When provided, Signer must also be provided.
 	Certificate *x509.Certificate
-	// Signer is the private key for an existing certificate.
+	// Signer is the private key for the certificate.
 	//
-	// Optional. When provided, Certificate must also be provided.
+	// Optional.
 	Signer crypto.Signer
+	// IssuingCertificateURL contains URLs to issuer certificates (AIA extension).
+	//
+	// Optional.
+	IssuingCertificateURL []string
+	// CRLDistributionPoints contains URLs to Certificate Revocation Lists.
+	//
+	// Optional.
+	CRLDistributionPoints []string
 }
 
 // CheckAndSetDefault validates the configuration.
 func (c *CertConfig) CheckAndSetDefault() error {
-	if (c.Certificate != nil && c.Signer == nil) || (c.Certificate == nil && c.Signer != nil) {
-		return errors.New("invalid input: Certificate and Signer must both be provided or both be nil")
+	if c.Certificate != nil && c.Signer == nil {
+		return errors.New("invalid input: Certificate requires Signer to be provided")
 	}
 	return nil
 }
@@ -72,11 +82,6 @@ func (c *CertConfig) CheckAndSetDefault() error {
 // hasExistingCert returns true if an existing certificate and signer are provided.
 func (c *CertConfig) hasExistingCert() bool {
 	return c != nil && c.Certificate != nil
-}
-
-// hasCustomConfig returns true if custom configuration (subject or validity) is provided.
-func (c *CertConfig) hasCustomConfig() bool {
-	return c != nil && (c.Subject != nil || c.Validity > 0)
 }
 
 // CAConfig defines configuration options for creating a [CA].
@@ -104,12 +109,10 @@ func (c *CAConfig) CheckAndSetDefault() error {
 		}
 	}
 
-	// If an existing intermediate certificate is provided, root must also be provided
 	if c.Intermediate.hasExistingCert() && !c.Root.hasExistingCert() {
 		return errors.New("root certificate must be provided when intermediate certificate is provided")
 	}
 
-	// If both certificates are provided, verify that intermediate is signed by root
 	if c.Root.hasExistingCert() && c.Intermediate.hasExistingCert() {
 		if err := c.Intermediate.Certificate.CheckSignatureFrom(c.Root.Certificate); err != nil {
 			return fmt.Errorf("intermediate certificate must be signed by root certificate: %w", err)
@@ -121,7 +124,6 @@ func (c *CAConfig) CheckAndSetDefault() error {
 
 // New creates a new [CA] with Root + Intermediate structure.
 //
-// The optionalCfg parameter can be used to customize the CA certificates.
 // If not provided, default values are used for both root and intermediate certificates.
 //
 // Example:
@@ -139,81 +141,37 @@ func (c *CAConfig) CheckAndSetDefault() error {
 //	        Validity: 24 * time.Hour,
 //	    },
 //	})
+//
+//	// With existing signers (certificates will be generated)
+//	ca, err := ekca.New(ekca.CAConfig{
+//	    Root: &ekca.CertConfig{
+//	        Signer: existingRootKey,
+//	    },
+//	    Intermediate: &ekca.CertConfig{
+//	        Signer: existingIntKey,
+//	    },
+//	})
 func New(optionalCfg ...CAConfig) (*CA, error) {
 	cfg := utils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
-	var rootCert *x509.Certificate
-	var rootKey crypto.Signer
-	var err error
-
-	// Use existing root certificate or create a new one
-	if cfg.Root.hasExistingCert() {
-		rootCert = cfg.Root.Certificate
-		rootKey = cfg.Root.Signer
-	} else {
-		rootKey, err = generateECDSAKey()
-		if err != nil {
-			return nil, fmt.Errorf("generate root key: %w", err)
-		}
-
-		// Set default subject if not provided
-		rootSubject := &pkix.Name{
-			Organization: []string{"go-tpm-kit"},
-			CommonName:   "TPM Simulator Root CA",
-		}
-		var rootValidity time.Duration
-		if cfg.Root.hasCustomConfig() {
-			if cfg.Root.Subject != nil {
-				rootSubject = cfg.Root.Subject
-			}
-			rootValidity = cfg.Root.Validity
-		}
-
-		rootCert, err = createRootCertificate(rootKey, rootSubject, rootValidity)
-		if err != nil {
-			return nil, fmt.Errorf("create root certificate: %w", err)
-		}
+	rootCert, rootSigner, err := initRootCA(cfg.Root)
+	if err != nil {
+		return nil, fmt.Errorf("init root CA: %w", err)
 	}
 
-	var intCert *x509.Certificate
-	var intKey crypto.Signer
-
-	// Use existing intermediate certificate or create a new one
-	if cfg.Intermediate.hasExistingCert() {
-		intCert = cfg.Intermediate.Certificate
-		intKey = cfg.Intermediate.Signer
-	} else {
-		intKey, err = generateECDSAKey()
-		if err != nil {
-			return nil, fmt.Errorf("generate intermediate key: %w", err)
-		}
-
-		// Set default subject if not provided
-		intSubject := &pkix.Name{
-			Organization: []string{"go-tpm-kit"},
-			CommonName:   "TPM Simulator Intermediate CA",
-		}
-		var intValidity time.Duration
-		if cfg.Intermediate.hasCustomConfig() {
-			if cfg.Intermediate.Subject != nil {
-				intSubject = cfg.Intermediate.Subject
-			}
-			intValidity = cfg.Intermediate.Validity
-		}
-
-		intCert, err = createIntermediateCertificate(rootCert, rootKey, intKey, intSubject, intValidity)
-		if err != nil {
-			return nil, fmt.Errorf("create intermediate certificate: %w", err)
-		}
+	intCert, intSigner, err := initIntermediateCA(cfg.Intermediate, rootCert, rootSigner)
+	if err != nil {
+		return nil, fmt.Errorf("init intermediate CA: %w", err)
 	}
 
 	return &CA{
 		Root:         rootCert,
 		Intermediate: intCert,
-		IntSigner:    intKey,
+		RootSigner:   rootSigner,
+		IntSigner:    intSigner,
 	}, nil
 }
 
@@ -278,6 +236,16 @@ type CertificateRequest struct {
 	//
 	// Optional.
 	CertRequester certRequester
+
+	// IssuingCertificateURL contains URLs to issuer certificates (AIA extension).
+	//
+	// Optional.
+	IssuingCertificateURL []string
+
+	// CRLDistributionPoints contains URLs to Certificate Revocation Lists.
+	//
+	// Optional.
+	CRLDistributionPoints []string
 }
 
 // CheckAndSetDefault checks and sets default values for the certificate request.
@@ -344,11 +312,13 @@ func (ca *CA) GenerateCertificate(req CertificateRequest) ([]byte, error) {
 		Subject:      req.Subject,
 		// NotBefore is one minute in the past to prevent "Not yet valid" errors on
 		// time skewed systems.
-		NotBefore:          time.Now().UTC().Add(-1 * time.Minute),
-		NotAfter:           req.NotAfter,
-		KeyUsage:           keyUsage,
-		UnknownExtKeyUsage: []asn1.ObjectIdentifier{oid.EKCertificate},
-		ExtraExtensions:    extensions,
+		NotBefore:             time.Now().UTC().Add(-1 * time.Minute),
+		NotAfter:              req.NotAfter,
+		KeyUsage:              keyUsage,
+		UnknownExtKeyUsage:    []asn1.ObjectIdentifier{oid.EKCertificate},
+		ExtraExtensions:       extensions,
+		IssuingCertificateURL: req.IssuingCertificateURL,
+		CRLDistributionPoints: req.CRLDistributionPoints,
 		// BasicConstraintsValid is true to not allow any intermediate certs.
 		BasicConstraintsValid: true,
 		IsCA:                  false,

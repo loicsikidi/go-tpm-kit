@@ -6,6 +6,10 @@
 package tpmtest
 
 import (
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/x509/pkix"
 	"sync"
 	"testing"
@@ -22,7 +26,26 @@ var (
 	caOnce     sync.Once
 	caInstance *ekca.CA
 	caErr      error
+
+	httpServerMu    sync.Mutex
+	httpServerCache = make(map[string]*HTTPServer)
+
+	rootSigner         crypto.Signer
+	intermediateSigner crypto.Signer
 )
+
+func init() {
+	var err error
+	rootSigner, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		panic("failed to generate root signer: " + err.Error())
+	}
+
+	intermediateSigner, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		panic("failed to generate intermediate signer: " + err.Error())
+	}
+}
 
 const (
 	// defaultRootValidity is the default validity period for root certificates.
@@ -33,9 +56,7 @@ const (
 
 // GetEndorsementCA returns the singleton [ekca.CA] instance.
 //
-// The CA is created once on the first call using [sync.Once] and reused
-// for subsequent calls. This ensures all EK certificates are signed by
-// the same CA across all tests.
+// This ensures all EK certificates are signed by the same CA across all tests.
 func GetEndorsementCA() (*ekca.CA, error) {
 	caOnce.Do(func() {
 		cfg := ekca.CAConfig{
@@ -45,6 +66,7 @@ func GetEndorsementCA() (*ekca.CA, error) {
 					CommonName:   "TPM Simulator Root CA",
 				},
 				Validity: defaultRootValidity,
+				Signer:   rootSigner,
 			},
 			Intermediate: &ekca.CertConfig{
 				Subject: &pkix.Name{
@@ -52,6 +74,7 @@ func GetEndorsementCA() (*ekca.CA, error) {
 					CommonName:   "TPM Simulator Intermediate CA",
 				},
 				Validity: defaultIntermediateValidity,
+				Signer:   intermediateSigner,
 			},
 		}
 		caInstance, caErr = ekca.New(cfg)
@@ -70,6 +93,53 @@ func MustGetEndorsementCA() *ekca.CA {
 	return ca
 }
 
+// GetHTTPServer returns the HTTP server associated with the given test.
+func GetHTTPServer(t *testing.T) *HTTPServer {
+	httpServerMu.Lock()
+	defer httpServerMu.Unlock()
+	return httpServerCache[t.Name()]
+}
+
+// getEndorsementCAWithHTTPServer creates a new CA instance with HTTP server URLs.
+func getEndorsementCAWithHTTPServer(baseURL string) (*ekca.CA, error) {
+	cfg := ekca.CAConfig{
+		Root: &ekca.CertConfig{
+			Subject: &pkix.Name{
+				Organization: []string{"go-tpm-kit"},
+				CommonName:   "TPM Simulator Root CA",
+			},
+			Validity:              defaultRootValidity,
+			Signer:                rootSigner,
+			CRLDistributionPoints: []string{baseURL + "/crl/root"},
+		},
+		Intermediate: &ekca.CertConfig{
+			Subject: &pkix.Name{
+				Organization: []string{"go-tpm-kit"},
+				CommonName:   "TPM Simulator Intermediate CA",
+			},
+			Validity:              defaultIntermediateValidity,
+			Signer:                intermediateSigner,
+			IssuingCertificateURL: []string{baseURL + "/issuer/root"},
+			CRLDistributionPoints: []string{baseURL + "/crl/root"},
+		},
+	}
+	return ekca.New(cfg)
+}
+
+// storeHTTPServer stores the HTTP server in the cache for the given test.
+func storeHTTPServer(t *testing.T, server *HTTPServer) {
+	httpServerMu.Lock()
+	defer httpServerMu.Unlock()
+	httpServerCache[t.Name()] = server
+}
+
+// removeHTTPServer removes the HTTP server from the cache for the given test.
+func removeHTTPServer(t *testing.T) {
+	httpServerMu.Lock()
+	defer httpServerMu.Unlock()
+	delete(httpServerCache, t.Name())
+}
+
 // OpenConfig configures the simulator initialization with EK certificates.
 type OpenConfig struct {
 	// EKCerts is the list of EK templates to provision with certificates.
@@ -86,6 +156,14 @@ type OpenConfig struct {
 	//
 	// Default: false.
 	SkipCleanup bool
+	// EnableHTTPServer enables the HTTP server for serving CA certificates and CRLs.
+	// When enabled, AIA (Authority Information Access) and CRL Distribution Points
+	// extensions are added to all certificates (Root, Intermediate, and EK).
+	//
+	// The HTTP server can be accessed via [GetHTTPServer] for testing purposes.
+	//
+	// Default: false.
+	EnableHTTPServer bool
 }
 
 // CheckAndSetDefault checks and sets default values for the open configuration.
@@ -129,7 +207,38 @@ func OpenSimulator(t *testing.T, optionalCfg ...OpenConfig) transport.TPM {
 	}
 	cfg := utils.OptionalArg(optionalCfg)
 	if !cfg.SkipProvisioning {
-		initSimu(t, tpm, cfg)
+		var httpServer *HTTPServer
+		var ca *ekca.CA
+
+		if cfg.EnableHTTPServer {
+			httpServer = NewHTTPServer()
+
+			ca, err = getEndorsementCAWithHTTPServer(httpServer.BaseURL())
+			if err != nil {
+				httpServer.Close()
+				t.Fatalf("failed to create CA with HTTP server: %v", err)
+			}
+
+			if err := httpServer.Initialize(ca); err != nil {
+				httpServer.Close()
+				t.Fatalf("failed to initialize HTTP server: %v", err)
+			}
+
+			// Store HTTP server in cache for later access
+			storeHTTPServer(t, httpServer)
+
+			t.Cleanup(func() {
+				httpServer.Close()
+				removeHTTPServer(t)
+			})
+		} else {
+			ca, err = GetEndorsementCA()
+			if err != nil {
+				t.Fatalf("failed to get CA: %v", err)
+			}
+		}
+
+		initSimu(t, tpm, cfg, ca, httpServer)
 	}
 	if !cfg.SkipCleanup {
 		t.Cleanup(func() {

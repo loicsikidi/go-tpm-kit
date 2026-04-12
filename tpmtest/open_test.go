@@ -91,3 +91,73 @@ func verifyCertInNV(t *testing.T, tpm transport.TPM, index tpm2.TPMHandle) {
 		t.Errorf("certificate missing EKCertificate OID in extended key usage")
 	}
 }
+
+func TestOpenSimulator_WithHTTPServer(t *testing.T) {
+	tpm := tpmtest.OpenSimulator(t, tpmtest.OpenConfig{
+		EnableHTTPServer: true,
+	})
+
+	server := tpmtest.GetHTTPServer(t)
+	if server == nil {
+		t.Fatal("GetHTTPServer returned nil")
+	}
+
+	// Verify certificates in NV RAM have AIA and CRL DP extensions
+	verifyCertWithHTTPExtensions(t, tpm, server, tpmtest.RSACertIndex)
+	verifyCertWithHTTPExtensions(t, tpm, server, tpmtest.ECCCertIndex)
+}
+
+func TestOpenSimulator_WithHTTPServer_CustomTemplates(t *testing.T) {
+	templates := []tpmtest.Template{
+		tpmtest.TemplateRSA2048,
+		tpmtest.TemplateECCP384,
+	}
+
+	tpm := tpmtest.OpenSimulator(t, tpmtest.OpenConfig{
+		EKCerts:          templates,
+		EnableHTTPServer: true,
+	})
+
+	server := tpmtest.GetHTTPServer(t)
+	if server == nil {
+		t.Fatal("GetHTTPServer returned nil")
+	}
+
+	for _, template := range templates {
+		verifyCertWithHTTPExtensions(t, tpm, server, template.Index)
+	}
+}
+
+func verifyCertWithHTTPExtensions(t *testing.T, tpm transport.TPM, server *tpmtest.HTTPServer, index tpm2.TPMHandle) {
+	t.Helper()
+
+	certDER, err := tpmutil.NVRead(tpm, tpmutil.NVReadConfig{Index: index})
+	if err != nil {
+		t.Fatalf("NVRead failed: %v", err)
+	}
+
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("ParseCertificate failed: %v", err)
+	}
+
+	// Verify AIA extension
+	if len(cert.IssuingCertificateURL) == 0 {
+		t.Error("certificate missing IssuingCertificateURL (AIA extension)")
+	} else {
+		expectedAIA := server.IssuerURL(tpmtest.CATypeIntermediate)
+		if cert.IssuingCertificateURL[0] != expectedAIA {
+			t.Errorf("IssuingCertificateURL = %s, want %s", cert.IssuingCertificateURL[0], expectedAIA)
+		}
+	}
+
+	// Verify CRL DP extension
+	if len(cert.CRLDistributionPoints) == 0 {
+		t.Error("certificate missing CRLDistributionPoints extension")
+	} else {
+		expectedCRLDP := server.CRLURL(tpmtest.CATypeIntermediate)
+		if cert.CRLDistributionPoints[0] != expectedCRLDP {
+			t.Errorf("CRLDistributionPoints = %s, want %s", cert.CRLDistributionPoints[0], expectedCRLDP)
+		}
+	}
+}
