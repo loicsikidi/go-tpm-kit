@@ -163,7 +163,7 @@ func (h *httpHandler) serveIssuer(w http.ResponseWriter, caType CAType) {
 
 	w.Header().Set("Content-Type", "application/x-x509-ca-cert")
 	w.WriteHeader(http.StatusOK)
-	w.Write(cert)
+	w.Write(cert) //nolint:errcheck
 }
 
 func (h *httpHandler) serveCRL(w http.ResponseWriter, caType CAType) {
@@ -185,7 +185,7 @@ func (h *httpHandler) serveCRL(w http.ResponseWriter, caType CAType) {
 
 	w.Header().Set("Content-Type", "application/pkix-crl")
 	w.WriteHeader(http.StatusOK)
-	w.Write(crl)
+	w.Write(crl) //nolint:errcheck
 }
 
 // BaseURL returns the base URL of the HTTP server.
