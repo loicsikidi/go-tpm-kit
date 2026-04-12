@@ -63,7 +63,7 @@ func TestNVReadConfigValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.cfg.CheckAndSetDefault()
+			err := tt.cfg.CheckAndSetDefaults()
 			if tt.wantErr != nil {
 				if err == nil {
 					t.Errorf("expected error %v, got nil", tt.wantErr)
@@ -116,7 +116,7 @@ func TestNVWriteConfigValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.cfg.CheckAndSetDefault()
+			err := tt.cfg.CheckAndSetDefaults()
 			if tt.wantErr != nil {
 				if err == nil {
 					t.Errorf("expected error %v, got nil", tt.wantErr)
@@ -175,7 +175,7 @@ func TestSignConfigValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.cfg.CheckAndSetDefault()
+			err := tt.cfg.CheckAndSetDefaults()
 			if tt.wantErr != nil {
 				if err == nil {
 					t.Errorf("expected error %v, got nil", tt.wantErr)
@@ -211,7 +211,7 @@ func TestSignConfigValidation_PublicKeyFromHandle(t *testing.T) {
 			KeyHandle: keyHandle,
 			Digest:    []byte("test"),
 		}
-		if err := cfg.CheckAndSetDefault(); err != nil {
+		if err := cfg.CheckAndSetDefaults(); err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
 		if cfg.PublicKey == nil {
@@ -233,7 +233,7 @@ func TestSignConfigValidation_PublicKeyFromHandle(t *testing.T) {
 			KeyHandle: handle,
 			Digest:    []byte("test"),
 		}
-		if err := cfg.CheckAndSetDefault(); err != tpmutil.ErrMissingPublicKey {
+		if err := cfg.CheckAndSetDefaults(); err != tpmutil.ErrMissingPublicKey {
 			t.Errorf("expected error %v, got %v", tpmutil.ErrMissingPublicKey, err)
 		}
 	})
@@ -367,7 +367,7 @@ func TestGetKeyHandleConfigValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.cfg.CheckAndSetDefault()
+			err := tt.cfg.CheckAndSetDefaults()
 			if tt.wantErr {
 				if err == nil {
 					t.Error("expected error, got nil")
@@ -447,7 +447,7 @@ func TestHmacConfigValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.cfg.CheckAndSetDefault()
+			err := tt.cfg.CheckAndSetDefaults()
 			if tt.wantErr != nil {
 				if err == nil {
 					t.Errorf("expected error %v, got nil", tt.wantErr)

@@ -341,9 +341,9 @@ func TestCreatePrimaryConfig_CheckAndSetDefault(t *testing.T) {
 			InPublic: eccTemplate,
 		}
 
-		err := cfg.CheckAndSetDefault()
+		err := cfg.CheckAndSetDefaults()
 		if err != nil {
-			t.Fatalf("CheckAndSetDefault() failed: %v", err)
+			t.Fatalf("CheckAndSetDefaults() failed: %v", err)
 		}
 
 		if cfg.PrimaryHandle != tpm2.TPMRHOwner {
@@ -362,9 +362,9 @@ func TestCreatePrimaryConfig_CheckAndSetDefault(t *testing.T) {
 			InPublic:      eccTemplate,
 		}
 
-		err := cfg.CheckAndSetDefault()
+		err := cfg.CheckAndSetDefaults()
 		if err != nil {
-			t.Fatalf("CheckAndSetDefault() failed: %v", err)
+			t.Fatalf("CheckAndSetDefaults() failed: %v", err)
 		}
 
 		if cfg.PrimaryHandle != tpm2.TPMRHEndorsement {
@@ -379,7 +379,7 @@ func TestCreatePrimaryConfig_CheckAndSetDefault(t *testing.T) {
 			SealingData: []byte("secret data"),
 		}
 
-		err := cfg.CheckAndSetDefault()
+		err := cfg.CheckAndSetDefaults()
 		if err == nil {
 			t.Error("Expected error when SealingData is provided with non-KeyedHash template, got nil")
 		}
@@ -398,7 +398,7 @@ func TestCreatePrimaryConfig_CheckAndSetDefault(t *testing.T) {
 			SealingData: []byte("secret data"),
 		}
 
-		err := cfg.CheckAndSetDefault()
+		err := cfg.CheckAndSetDefaults()
 		if err == nil {
 			t.Error("Expected error when SealingData is provided with SensitiveDataOrigin set, got nil")
 		}
@@ -417,7 +417,7 @@ func TestCreatePrimaryConfig_CheckAndSetDefault(t *testing.T) {
 			SealingData: []byte("secret data"),
 		}
 
-		err := cfg.CheckAndSetDefault()
+		err := cfg.CheckAndSetDefaults()
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -521,9 +521,9 @@ func TestLoadConfig_CheckAndSetDefault(t *testing.T) {
 			InPublic:     tpm2.TPM2BPublic{},
 		}
 
-		err := cfg.CheckAndSetDefault()
+		err := cfg.CheckAndSetDefaults()
 		if err != nil {
-			t.Fatalf("CheckAndSetDefault() failed: %v", err)
+			t.Fatalf("CheckAndSetDefaults() failed: %v", err)
 		}
 
 		if cfg.ParentAuth == nil {
@@ -537,7 +537,7 @@ func TestLoadConfig_CheckAndSetDefault(t *testing.T) {
 			InPublic:  tpm2.TPM2BPublic{},
 		}
 
-		err := cfg.CheckAndSetDefault()
+		err := cfg.CheckAndSetDefaults()
 		if err == nil {
 			t.Error("Expected error for missing parent handle, got nil")
 		}
@@ -554,7 +554,7 @@ func TestLoadConfig_CheckAndSetDefault(t *testing.T) {
 			InPublic:     tpm2.TPM2BPublic{},
 		}
 
-		err := cfg.CheckAndSetDefault()
+		err := cfg.CheckAndSetDefaults()
 		if err == nil {
 			t.Error("Expected error for missing InPrivate, got nil")
 		}

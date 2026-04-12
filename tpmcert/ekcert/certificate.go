@@ -97,7 +97,7 @@ type Config struct {
 	DownloaderTimeout time.Duration
 }
 
-func (cfg *Config) CheckAndSetDefault() error {
+func (cfg *Config) CheckAndSetDefaults() error {
 	if cfg.MaxDownloads <= 0 {
 		cfg.MaxDownloads = DefaultMaxDownloads
 	}
@@ -113,7 +113,7 @@ func (cfg *Config) CheckAndSetDefault() error {
 // New creates a new [EKCertificate] instance from the given [x509.Certificate].
 func New(cert *x509.Certificate, optionalCfg ...Config) (*EKCertificate, error) {
 	cfg := utils.OptionalArg(optionalCfg)
-	if err := cfg.CheckAndSetDefault(); err != nil {
+	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, err
 	}
 

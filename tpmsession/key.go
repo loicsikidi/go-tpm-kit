@@ -193,7 +193,7 @@ func (sk *SessionKey) unmarshal(data []byte) error {
 }
 
 // CheckAndSetDefault validates the SessionKey structure.
-func (sk *SessionKey) CheckAndSetDefault() error {
+func (sk *SessionKey) CheckAndSetDefaults() error {
 	if sk.SessionType != BoundSession && sk.SessionType != SaltedSession {
 		return errors.New("session type must be either BoundSession or SaltedSession")
 	}
@@ -302,7 +302,7 @@ func CreateSessionKey(tpm transport.TPM, sessionType SessionType, handle tpm2.TP
 	}
 
 	// Validate the key before returning
-	if err := sk.CheckAndSetDefault(); err != nil {
+	if err := sk.CheckAndSetDefaults(); err != nil {
 		return nil, fmt.Errorf("validate session key: %w", err)
 	}
 

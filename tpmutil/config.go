@@ -33,7 +33,7 @@ type HashConfig struct {
 }
 
 // CheckAndSetDefault validates and sets default values for HashConfig.
-func (c *HashConfig) CheckAndSetDefault() error {
+func (c *HashConfig) CheckAndSetDefaults() error {
 	if c.BlockSize < 0 {
 		return ErrInvalidBlockSize
 	}
@@ -76,7 +76,7 @@ type SignConfig struct {
 }
 
 // CheckAndSetDefault validates and sets default values for SignConfig.
-func (c *SignConfig) CheckAndSetDefault() error {
+func (c *SignConfig) CheckAndSetDefaults() error {
 	if c.KeyHandle == nil {
 		return ErrMissingHandle
 	}
@@ -128,7 +128,7 @@ type NVReadConfig struct {
 }
 
 // CheckAndSetDefault validates and sets default values for NVReadConfig.
-func (c *NVReadConfig) CheckAndSetDefault() error {
+func (c *NVReadConfig) CheckAndSetDefaults() error {
 	if c.Index == 0 {
 		return ErrMissingIndex
 	}
@@ -176,7 +176,7 @@ type NVWriteConfig struct {
 }
 
 // CheckAndSetDefault validates and sets default values for NVWriteConfig.
-func (c *NVWriteConfig) CheckAndSetDefault() error {
+func (c *NVWriteConfig) CheckAndSetDefaults() error {
 	if c.Index == 0 {
 		return ErrMissingIndex
 	}
@@ -229,7 +229,7 @@ type ParentConfig struct {
 }
 
 // CheckAndSetDefault validates and sets default values for NVWriteConfig.
-func (c *ParentConfig) CheckAndSetDefault() error {
+func (c *ParentConfig) CheckAndSetDefaults() error {
 	if c.Handle == nil {
 		c.Handle = NewHandle(tpmkit.SRKHandle)
 	}
@@ -284,7 +284,7 @@ type EKParentConfig struct {
 	Force bool
 }
 
-func (c *EKParentConfig) CheckAndSetDefault() error {
+func (c *EKParentConfig) CheckAndSetDefaults() error {
 	if c.KeyFamily == 0 {
 		c.KeyFamily = ECC
 	}
@@ -346,7 +346,7 @@ type CreatePrimaryConfig struct {
 }
 
 // CheckAndSetDefault validates and sets default values for CreatePrimaryConfig.
-func (c *CreatePrimaryConfig) CheckAndSetDefault() error {
+func (c *CreatePrimaryConfig) CheckAndSetDefaults() error {
 	if c.PrimaryHandle == 0 {
 		c.PrimaryHandle = tpm2.TPMRHOwner
 	}
@@ -393,7 +393,7 @@ type CreateConfig struct {
 }
 
 // CheckAndSetDefault validates and sets default values for CreateConfig.
-func (c *CreateConfig) CheckAndSetDefault() error {
+func (c *CreateConfig) CheckAndSetDefaults() error {
 	if c.ParentHandle == nil {
 		return ErrMissingHandle
 	}
@@ -432,7 +432,7 @@ type LoadConfig struct {
 }
 
 // CheckAndSetDefault validates and sets default values for LoadConfig.
-func (c *LoadConfig) CheckAndSetDefault() error {
+func (c *LoadConfig) CheckAndSetDefaults() error {
 	if c.ParentHandle == nil {
 		return ErrMissingHandle
 	}
@@ -478,7 +478,7 @@ type SymEncryptDecryptConfig struct {
 }
 
 // CheckAndSetDefault validates and sets default values for SymEncryptDecryptConfig.
-func (c *SymEncryptDecryptConfig) CheckAndSetDefault() error {
+func (c *SymEncryptDecryptConfig) CheckAndSetDefaults() error {
 	if c.KeyHandle == nil {
 		return ErrMissingHandle
 	}
@@ -532,7 +532,7 @@ type HmacConfig struct {
 }
 
 // CheckAndSetDefault validates and sets default values for HmacConfig.
-func (c *HmacConfig) CheckAndSetDefault() error {
+func (c *HmacConfig) CheckAndSetDefaults() error {
 	if c.KeyHandle == nil {
 		return ErrMissingHandle
 	}
@@ -569,7 +569,7 @@ type KeyConfig struct {
 	Scheme tpm2.TPMAlgID
 }
 
-func (c *KeyConfig) CheckAndSetDefault() error {
+func (c *KeyConfig) CheckAndSetDefaults() error {
 	if c.KeyType == UnspecifiedAlgo {
 		c.KeyType = ECCNISTP256
 	}
@@ -591,7 +591,7 @@ type GetPersistedKeyHandleConfig struct {
 }
 
 // CheckAndSetDefault validates [GetPersistedKeyHandleConfig] fields.
-func (c *GetPersistedKeyHandleConfig) CheckAndSetDefault() error {
+func (c *GetPersistedKeyHandleConfig) CheckAndSetDefaults() error {
 	if c.Handle == nil {
 		return ErrMissingHandle
 	}
@@ -635,7 +635,7 @@ type PersistConfig struct {
 	SkipFlush bool
 }
 
-func (c *PersistConfig) CheckAndSetDefault() error {
+func (c *PersistConfig) CheckAndSetDefaults() error {
 	if c.TransientHandle == nil {
 		return fmt.Errorf("invalid value: 'TransientHandle' is required")
 	}

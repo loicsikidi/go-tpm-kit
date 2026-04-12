@@ -342,7 +342,7 @@ func TestSessionManager_IntegrationWithTPMCommands(t *testing.T) {
 		}
 
 		// Validate
-		if err := key.CheckAndSetDefault(); err != nil {
+		if err := key.CheckAndSetDefaults(); err != nil {
 			t.Fatalf("CheckAndSetDefault failed: %v", err)
 		}
 

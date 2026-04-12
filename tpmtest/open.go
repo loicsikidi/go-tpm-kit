@@ -167,7 +167,7 @@ type OpenConfig struct {
 }
 
 // CheckAndSetDefault checks and sets default values for the open configuration.
-func (c *OpenConfig) CheckAndSetDefault() error {
+func (c *OpenConfig) CheckAndSetDefaults() error {
 	if len(c.EKCerts) == 0 {
 		// Default: low-range RSA and ECC
 		c.EKCerts = []Template{TemplateRSA, TemplateECC}

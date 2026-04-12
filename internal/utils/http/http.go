@@ -50,7 +50,7 @@ type Config struct {
 }
 
 // CheckAndSetDefault validates the configuration and sets default values.
-func (c *Config) CheckAndSetDefault() error {
+func (c *Config) CheckAndSetDefaults() error {
 	if c.MaxSize == 0 {
 		c.MaxSize = maxHTTPGetSize
 	}
@@ -67,7 +67,7 @@ func (c *Config) CheckAndSetDefault() error {
 
 func HttpGET(ctx context.Context, client HTTPClient, url string, optionalCfg ...Config) ([]byte, error) {
 	cfg := utils.OptionalArg(optionalCfg)
-	if err := cfg.CheckAndSetDefault(); err != nil {
+	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, err
 	}
 

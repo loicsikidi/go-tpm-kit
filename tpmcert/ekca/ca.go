@@ -72,7 +72,7 @@ type CertConfig struct {
 }
 
 // CheckAndSetDefault validates the configuration.
-func (c *CertConfig) CheckAndSetDefault() error {
+func (c *CertConfig) CheckAndSetDefaults() error {
 	if c.Certificate != nil && c.Signer == nil {
 		return errors.New("invalid input: Certificate requires Signer to be provided")
 	}
@@ -97,14 +97,14 @@ type CAConfig struct {
 }
 
 // CheckAndSetDefault validates and sets default values for the CA configuration.
-func (c *CAConfig) CheckAndSetDefault() error {
+func (c *CAConfig) CheckAndSetDefaults() error {
 	if c.Root != nil {
-		if err := c.Root.CheckAndSetDefault(); err != nil {
+		if err := c.Root.CheckAndSetDefaults(); err != nil {
 			return fmt.Errorf("root config: %w", err)
 		}
 	}
 	if c.Intermediate != nil {
-		if err := c.Intermediate.CheckAndSetDefault(); err != nil {
+		if err := c.Intermediate.CheckAndSetDefaults(); err != nil {
 			return fmt.Errorf("intermediate config: %w", err)
 		}
 	}
@@ -153,7 +153,7 @@ func (c *CAConfig) CheckAndSetDefault() error {
 //	})
 func New(optionalCfg ...CAConfig) (*CA, error) {
 	cfg := utils.OptionalArg(optionalCfg)
-	if err := cfg.CheckAndSetDefault(); err != nil {
+	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
@@ -249,7 +249,7 @@ type CertificateRequest struct {
 }
 
 // CheckAndSetDefault checks and sets default values for the certificate request.
-func (c *CertificateRequest) CheckAndSetDefault() error {
+func (c *CertificateRequest) CheckAndSetDefaults() error {
 	if c.CertRequester != nil {
 		c.PublicKey = c.CertRequester.GetPublicKey()
 		c.Subject = c.CertRequester.Subject()
@@ -286,7 +286,7 @@ func (c *CertificateRequest) CheckAndSetDefault() error {
 // The Subject Alternative Name extension is marked as critical when the Subject
 // field is empty, as required by the X.509 specification.
 func (ca *CA) GenerateCertificate(req CertificateRequest) ([]byte, error) {
-	if err := req.CheckAndSetDefault(); err != nil {
+	if err := req.CheckAndSetDefaults(); err != nil {
 		return nil, fmt.Errorf("validate request: %w", err)
 	}
 

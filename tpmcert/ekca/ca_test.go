@@ -378,9 +378,9 @@ func TestCertConfig_Validation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.cfg.CheckAndSetDefault()
+			err := tt.cfg.CheckAndSetDefaults()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("CheckAndSetDefault() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("CheckAndSetDefaults() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -441,9 +441,9 @@ func TestCertificateRequest_Validation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.req.CheckAndSetDefault()
+			err := tt.req.CheckAndSetDefaults()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("CheckAndSetDefault() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("CheckAndSetDefaults() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

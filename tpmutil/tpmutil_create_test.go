@@ -434,9 +434,9 @@ func TestCreateConfig_CheckAndSetDefault(t *testing.T) {
 			InPublic:     eccTemplate,
 		}
 
-		err := cfg.CheckAndSetDefault()
+		err := cfg.CheckAndSetDefaults()
 		if err != nil {
-			t.Fatalf("CheckAndSetDefault() failed: %v", err)
+			t.Fatalf("CheckAndSetDefaults() failed: %v", err)
 		}
 
 		if cfg.ParentAuth == nil {
@@ -450,7 +450,7 @@ func TestCreateConfig_CheckAndSetDefault(t *testing.T) {
 			InPublic: eccTemplate,
 		}
 
-		err := cfg.CheckAndSetDefault()
+		err := cfg.CheckAndSetDefaults()
 		if err == nil {
 			t.Error("Expected error for missing parent handle, got nil")
 		}
@@ -468,7 +468,7 @@ func TestCreateConfig_CheckAndSetDefault(t *testing.T) {
 			SealingData:  []byte("secret data"),
 		}
 
-		err := cfg.CheckAndSetDefault()
+		err := cfg.CheckAndSetDefaults()
 		if err == nil {
 			t.Error("Expected error when SealingData is provided with non-KeyedHash template")
 		}
@@ -496,7 +496,7 @@ func TestCreateConfig_CheckAndSetDefault(t *testing.T) {
 			SealingData: []byte("secret data"),
 		}
 
-		err := cfg.CheckAndSetDefault()
+		err := cfg.CheckAndSetDefaults()
 		if err == nil {
 			t.Error("Expected error when SealingData is provided with SensitiveDataOrigin set")
 		}

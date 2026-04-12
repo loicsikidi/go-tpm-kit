@@ -170,7 +170,7 @@ var mapKtyToInfo = map[KeyType]info{
 // NewApplicationKeyTemplate creates a new TPM public key template for application keys.
 func NewApplicationKeyTemplate(optionalConfig ...KeyConfig) (tpm2.TPMTPublic, error) {
 	cfg := utils.OptionalArg(optionalConfig)
-	if err := cfg.CheckAndSetDefault(); err != nil {
+	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return tpm2.TPMTPublic{}, err
 	}
 	return newKeyTemplate(cfg, map[KeyFamily]tpm2.TPMTPublic{RSA: rsaSigningAppKeyTemplate, ECC: eccSigningAppKeyTemplate})
@@ -191,7 +191,7 @@ func MustApplicationKeyTemplate(optionalConfig ...KeyConfig) tpm2.TPMTPublic {
 // since restricted signing keys require a specific signature scheme.
 func NewAKTemplate(optionalConfig ...KeyConfig) (tpm2.TPMTPublic, error) {
 	cfg := utils.OptionalArg(optionalConfig)
-	if err := cfg.CheckAndSetDefault(); err != nil {
+	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return tpm2.TPMTPublic{}, err
 	}
 

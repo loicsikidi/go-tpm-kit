@@ -32,7 +32,7 @@ const (
 func initSimu(t *testing.T, tpm transport.TPM, cfg OpenConfig, ca *ekca.CA, httpServer *HTTPServer) {
 	t.Helper()
 
-	if err := cfg.CheckAndSetDefault(); err != nil {
+	if err := cfg.CheckAndSetDefaults(); err != nil {
 		t.Fatalf("invalid config: %v", err)
 	}
 

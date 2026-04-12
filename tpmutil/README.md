@@ -115,13 +115,13 @@ pcrs := tpmutil.PCRSelectToPCRs([]byte{0x83, 0x00, 0x00}) // Returns []uint{0, 1
 
 ## Configuration Pattern
 
-All main functions accept configuration structs that implement the `CheckAndSetDefault()` pattern for validation and default value handling:
+All main functions accept configuration structs that implement the `CheckAndSetDefaults()` pattern for validation and default value handling:
 
 ```go
 cfg := &tpmutil.HashConfig{
     Data:    data,
     HashAlg: crypto.SHA256,
 }
-// CheckAndSetDefault() called internally - sets defaults and validates
+// CheckAndSetDefaults() called internally - sets defaults and validates
 result, err := tpmutil.Hash(tpm, cfg)
 ```
