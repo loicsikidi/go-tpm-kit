@@ -29,25 +29,20 @@ const (
 )
 
 // initSimu provisions a TPM simulator with EK certificates.
-func initSimu(t *testing.T, tpm transport.TPM, cfg OpenConfig) {
+func initSimu(t *testing.T, tpm transport.TPM, cfg OpenConfig, ca *ekca.CA, httpServer *HTTPServer) {
 	t.Helper()
 
 	if err := cfg.CheckAndSetDefault(); err != nil {
 		t.Fatalf("invalid config: %v", err)
 	}
 
-	ca, err := GetEndorsementCA()
-	if err != nil {
-		t.Fatalf("failed to get CA: %v", err)
-	}
-
 	for _, template := range cfg.EKCerts {
-		provisionEK(t, tpm, ca, template)
+		provisionEK(t, tpm, ca, template, httpServer)
 	}
 }
 
 // provisionEK creates an EK and its certificate for the given template.
-func provisionEK(t *testing.T, tpm transport.TPM, ca *ekca.CA, template Template) {
+func provisionEK(t *testing.T, tpm transport.TPM, ca *ekca.CA, template Template, httpServer *HTTPServer) {
 	t.Helper()
 
 	hc, err := tpmutil.CreatePrimary(tpm, tpmutil.CreatePrimaryConfig{
@@ -64,7 +59,7 @@ func provisionEK(t *testing.T, tpm transport.TPM, ca *ekca.CA, template Template
 		t.Fatalf("extract public key failed: %v", err)
 	}
 
-	certDER, err := ca.GenerateCertificate(ekca.CertificateRequest{
+	req := ekca.CertificateRequest{
 		PublicKey: publicKey,
 		NotAfter:  time.Now().Add(defaultValidityMinutes * time.Minute),
 		SAN: &x509ext.SubjectAltName{
@@ -72,7 +67,14 @@ func provisionEK(t *testing.T, tpm transport.TPM, ca *ekca.CA, template Template
 			TPMModel:        defaultTPMModel,
 			TPMVersion:      defaultTPMVersion,
 		},
-	})
+	}
+
+	if httpServer != nil {
+		req.IssuingCertificateURL = []string{httpServer.IssuerURL(CATypeIntermediate)}
+		req.CRLDistributionPoints = []string{httpServer.CRLURL(CATypeIntermediate)}
+	}
+
+	certDER, err := ca.GenerateCertificate(req)
 	if err != nil {
 		t.Fatalf("generate certificate failed: %v", err)
 	}
