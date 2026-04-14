@@ -114,7 +114,7 @@ type NVReadConfig struct {
 	Auth tpm2.Session
 	// BlockSize for sequential read operations.
 	//
-	// Default: maxBufferSize (1024 bytes).
+	// Default: [maxNVBuffer] (512 bytes).
 	BlockSize int
 	// MultiIndex enables reading data from multiple successive NV indices.
 	//
@@ -135,8 +135,8 @@ func (c *NVReadConfig) CheckAndSetDefaults() error {
 	if c.BlockSize < 0 {
 		return ErrInvalidBlockSize
 	}
-	if c.BlockSize == 0 || c.BlockSize > maxBufferSize {
-		c.BlockSize = maxBufferSize
+	if c.BlockSize == 0 || c.BlockSize > maxNVBuffer {
+		c.BlockSize = maxNVBuffer
 	}
 	if c.Hierarchy == 0 {
 		c.Hierarchy = tpm2.TPMRHOwner

@@ -42,6 +42,7 @@ var (
 
 const (
 	maxBufferSize = tpmkit.MaxBufferSize
+	maxNVBuffer   = 512
 	maxNVSize     = 2048
 	maxIndexCount = 256
 )
