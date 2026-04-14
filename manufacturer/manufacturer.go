@@ -27,11 +27,15 @@ func (id ID) MarshalJSON() ([]byte, error) {
 
 // GetEncodings returns the ASCII and hexadecimal representations
 // of the manufacturer ID.
+//
+// Note: this function trims any trailing null characters from the ASCII representation and
+// any leading or trailing whitespace.
 func GetEncodings(id ID) (ascii, hexa string) {
 	b := [4]byte{}
 	binary.BigEndian.PutUint32(b[:], uint32(id))
 	ascii = string(b[:])
 	ascii = validChars.ReplaceAllString(ascii, "") // NOTE: strips \x00 characters
+	ascii = strings.TrimSpace(ascii)
 	hexa = strings.ToUpper(hex.EncodeToString(b[:]))
 	return
 }
