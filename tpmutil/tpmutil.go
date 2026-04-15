@@ -43,6 +43,8 @@ var (
 const (
 	maxBufferSize = tpmkit.MaxBufferSize
 	maxNVBuffer   = 512
+	// usually TPM is limited to 2048 bytes for NV Index data area
+	// TODO: retrieve this value from TPM properties (TPM_PT_NV_INDEX_MAX)
 	maxNVSize     = 2048
 	maxIndexCount = 256
 )
