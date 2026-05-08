@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/loicsikidi/go-tpm-kit/internal/utils"
 	"github.com/loicsikidi/go-tpm-kit/tpmcrypto"
+	goutils "github.com/loicsikidi/go-utils"
 )
 
 type KeyFamily int
@@ -169,7 +169,7 @@ var mapKtyToInfo = map[KeyType]info{
 
 // NewApplicationKeyTemplate creates a new TPM public key template for application keys.
 func NewApplicationKeyTemplate(optionalConfig ...KeyConfig) (tpm2.TPMTPublic, error) {
-	cfg := utils.OptionalArg(optionalConfig)
+	cfg := goutils.OptionalArg(optionalConfig)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return tpm2.TPMTPublic{}, err
 	}
@@ -190,7 +190,7 @@ func MustApplicationKeyTemplate(optionalConfig ...KeyConfig) tpm2.TPMTPublic {
 // For RSA AKs, if no scheme is specified (TPMAlgNull), TPMAlgRSASSA is used by default
 // since restricted signing keys require a specific signature scheme.
 func NewAKTemplate(optionalConfig ...KeyConfig) (tpm2.TPMTPublic, error) {
-	cfg := utils.OptionalArg(optionalConfig)
+	cfg := goutils.OptionalArg(optionalConfig)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return tpm2.TPMTPublic{}, err
 	}

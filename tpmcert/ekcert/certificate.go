@@ -20,9 +20,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/loicsikidi/go-tpm-kit/internal/utils"
 	"github.com/loicsikidi/go-tpm-kit/tpmcert/oid"
 	"github.com/loicsikidi/go-tpm-kit/tpmcert/x509ext"
+	goutils "github.com/loicsikidi/go-utils"
 )
 
 var (
@@ -112,7 +112,7 @@ func (cfg *Config) CheckAndSetDefaults() error {
 
 // New creates a new [EKCertificate] instance from the given [x509.Certificate].
 func New(cert *x509.Certificate, optionalCfg ...Config) (*EKCertificate, error) {
-	cfg := utils.OptionalArg(optionalCfg)
+	cfg := goutils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, err
 	}

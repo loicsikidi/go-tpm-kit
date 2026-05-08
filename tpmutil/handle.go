@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
-	"github.com/loicsikidi/go-tpm-kit/internal/utils"
+	goutils "github.com/loicsikidi/go-utils"
 )
 
 // HandleType represents the different types of handles in TPM 2.0.
@@ -336,7 +336,7 @@ func ToAuthHandle(h Handle, optionalAuth ...tpm2.Session) tpm2.AuthHandle {
 			return th.toAuthHandle()
 		}
 	}
-	auth := utils.OptionalArgWithDefault(optionalAuth, NoAuth)
+	auth := goutils.OptionalArgWithDefault(optionalAuth, NoAuth)
 	return tpm2.AuthHandle{
 		Handle: h.Handle(),
 		Name:   h.Name(),

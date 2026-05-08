@@ -12,9 +12,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/loicsikidi/go-tpm-kit/internal/utils"
 	"github.com/loicsikidi/go-tpm-kit/tpmcert/oid"
 	testutil "github.com/loicsikidi/go-tpm-kit/tpmtest/testutil/ek"
+	"github.com/loicsikidi/go-utils/crypto/pemutil"
 )
 
 func TestParseEKCert(t *testing.T) {
@@ -47,8 +47,7 @@ func TestParseEKCert(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// TODO(lsi): migrate to commons/crypto/pemutil
-			cert, err := utils.ParseCertificate(tt.pemBytes)
+			cert, err := pemutil.ParseCertificate(tt.pemBytes)
 			if err != nil {
 				t.Fatalf("ParseCertificate() error = %v", err)
 			}

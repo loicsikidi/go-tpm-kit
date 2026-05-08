@@ -18,9 +18,9 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/loicsikidi/go-tpm-kit/internal/utils"
 	"github.com/loicsikidi/go-tpm-kit/tpmcert/oid"
 	"github.com/loicsikidi/go-tpm-kit/tpmcert/x509ext"
+	goutils "github.com/loicsikidi/go-utils"
 )
 
 var ErrEKInvalidSAN = errors.New("subject alternative name must contain TPMManufacturer, TPMModel, and TPMVersion with valid values")
@@ -152,7 +152,7 @@ func (c *CAConfig) CheckAndSetDefaults() error {
 //	    },
 //	})
 func New(optionalCfg ...CAConfig) (*CA, error) {
-	cfg := utils.OptionalArg(optionalCfg)
+	cfg := goutils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}

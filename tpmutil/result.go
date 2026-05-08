@@ -13,7 +13,7 @@ import (
 	"slices"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/loicsikidi/go-tpm-kit/internal/utils"
+	goutils "github.com/loicsikidi/go-utils"
 )
 
 // tpm2bCreationData is an alias for the TPM2B wrapper around TPMSCreationData.
@@ -125,7 +125,7 @@ type marshaledCreateResult struct {
 //	}
 //	os.WriteFile("key.json", data, 0644)
 func (r CreateResult) Marshal(optionalTarget ...Target) ([]byte, error) {
-	target := utils.OptionalArgWithDefault(optionalTarget, JSON)
+	target := goutils.OptionalArgWithDefault(optionalTarget, JSON)
 	if err := target.Check(); err != nil {
 		return nil, err
 	}
@@ -294,7 +294,7 @@ type marshaledCreatePrimaryResult struct {
 //	}
 //	os.WriteFile("primary-key.json", data, 0644)
 func (r CreatePrimaryResult) Marshal(optionalTarget ...Target) ([]byte, error) {
-	target := utils.OptionalArgWithDefault(optionalTarget, JSON)
+	target := goutils.OptionalArgWithDefault(optionalTarget, JSON)
 	if err := target.Check(); err != nil {
 		return nil, err
 	}

@@ -18,8 +18,8 @@ import (
 	"github.com/google/go-tpm/tpm2/transport"
 	"github.com/google/go-tpm/tpm2/transport/simulator"
 
-	"github.com/loicsikidi/go-tpm-kit/internal/utils"
 	"github.com/loicsikidi/go-tpm-kit/tpmcert/ekca"
+	goutils "github.com/loicsikidi/go-utils"
 )
 
 var (
@@ -205,7 +205,7 @@ func OpenSimulator(t *testing.T, optionalCfg ...OpenConfig) transport.TPM {
 	if err != nil {
 		t.Fatalf("could not connect to TPM simulator: %v", err)
 	}
-	cfg := utils.OptionalArg(optionalCfg)
+	cfg := goutils.OptionalArg(optionalCfg)
 	if !cfg.SkipProvisioning {
 		var httpServer *HTTPServer
 		var ca *ekca.CA

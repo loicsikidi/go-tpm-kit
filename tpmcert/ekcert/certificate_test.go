@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/loicsikidi/go-tpm-kit/internal/utils"
-	crlutil "github.com/loicsikidi/go-tpm-kit/internal/utils/crl"
 	"github.com/loicsikidi/go-tpm-kit/tpmcert/ekca"
 	testutil "github.com/loicsikidi/go-tpm-kit/tpmtest/testutil/ek"
+	"github.com/loicsikidi/go-utils/crypto/pemutil"
+	"github.com/loicsikidi/go-utils/crypto/x509util"
 )
 
 func TestNewEKCertificate(t *testing.T) {
@@ -43,7 +43,7 @@ func TestNewEKCertificate(t *testing.T) {
 			SignatureAlgorithm:        x509.ECDSAWithSHA256,
 		}
 
-		crlBytes, err := crlutil.MarshalCRL(template, localCA.Intermediate, localCA.IntSigner)
+		crlBytes, err := x509util.MarshalCRL(template, localCA.Intermediate, localCA.IntSigner)
 		if err != nil {
 			t.Fatalf("failed to create CRL: %v", err)
 		}
@@ -94,7 +94,7 @@ func TestNewEKCertificate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cert, err := utils.ParseCertificate(tt.args.pemBytes)
+			cert, err := pemutil.ParseCertificate(tt.args.pemBytes)
 			if err != nil {
 				t.Fatalf("failed to parse certificate: %v", err)
 			}

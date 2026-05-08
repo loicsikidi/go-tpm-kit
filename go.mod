@@ -3,8 +3,8 @@ module github.com/loicsikidi/go-tpm-kit
 go 1.25.0
 
 require (
-	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/google/go-tpm v0.9.8
+	github.com/loicsikidi/go-utils v0.1.3
 	golang.org/x/term v0.38.0
 )
 

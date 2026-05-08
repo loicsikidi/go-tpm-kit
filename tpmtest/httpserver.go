@@ -16,8 +16,8 @@ import (
 	"sync"
 	"time"
 
-	crlutil "github.com/loicsikidi/go-tpm-kit/internal/utils/crl"
 	"github.com/loicsikidi/go-tpm-kit/tpmcert/ekca"
+	"github.com/loicsikidi/go-utils/crypto/x509util"
 )
 
 // CAType represents the type of Certificate Authority (Root or Intermediate).
@@ -222,5 +222,5 @@ func generateEmptyCRL(issuer *x509.Certificate, signer crypto.Signer, validity t
 		ThisUpdate: now,
 		NextUpdate: now.Add(validity),
 	}
-	return crlutil.MarshalCRL(template, issuer, signer)
+	return x509util.MarshalCRL(template, issuer, signer)
 }
