@@ -152,11 +152,11 @@ func (c *HashConfig) CheckAndSetDefaults() error {
 
 ### 1.6 Optional Configuration via Variadic Arguments
 
-Public API functions accept optional config structs as variadic arguments. The helper `utils.OptionalArg()` extracts the first element or returns the zero value:
+Public API functions accept optional config structs as variadic arguments. The helper `goutils.OptionalArg()` extracts the first element or returns the zero value:
 
 ```go
 func NVRead(t transport.TPM, optionalCfg ...NVReadConfig) ([]byte, error) {
-    cfg := utils.OptionalArg(optionalCfg)
+    cfg := goutils.OptionalArg(optionalCfg)
     if err := cfg.CheckAndSetDefaults(); err != nil {
         return nil, err
     }
@@ -649,7 +649,7 @@ When adding a new TPM operation to `tpmutil`, follow this checklist:
 5. **Create the public function** in `tpmutil.go` that:
    - Accepts `transport.TPM` as the first parameter
    - Accepts the config struct as a variadic parameter
-   - Calls `utils.OptionalArg()` + `cfg.CheckAndSetDefaults()`
+   - Calls `goutils.OptionalArg()` + `cfg.CheckAndSetDefaults()`
    - Delegates to an unexported implementation function
 6. **Create the private function** that receives validated, concrete parameters
 7. **Write tests** in a `tpmutil_<function>_test.go` file using:

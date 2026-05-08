@@ -16,10 +16,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/loicsikidi/go-tpm-kit/internal/utils"
-	crlutil "github.com/loicsikidi/go-tpm-kit/internal/utils/crl"
-	httputil "github.com/loicsikidi/go-tpm-kit/internal/utils/http"
 	"github.com/loicsikidi/go-tpm-kit/tpmcrypto"
+	goutils "github.com/loicsikidi/go-utils"
+	"github.com/loicsikidi/go-utils/crypto/x509util"
+	"github.com/loicsikidi/go-utils/net/httputil"
 )
 
 const (
@@ -33,7 +33,7 @@ type httpClient interface {
 }
 
 // CRL interface is duplicate here to avoid a reference to an internal package (i.e. crlutil)
-type CRL crlutil.CRL
+type CRL x509util.CRL
 
 type downloader struct {
 	client  httpClient
@@ -47,7 +47,7 @@ type intelEKCertResponse struct {
 
 // DownloadCRL downloads a Certificate Revocation List (CRL) from the specified URL.
 func (d *downloader) DownloadCRL(ctx context.Context, url *url.URL) (CRL, error) {
-	ctx, cancel := utils.WithTimeout(ctx, d.timeout)
+	ctx, cancel := goutils.WithTimeout(ctx, d.timeout)
 	defer cancel()
 
 	crlBytes, err := httputil.HttpGET(ctx, d.client, url.String())
@@ -60,12 +60,12 @@ func (d *downloader) DownloadCRL(ctx context.Context, url *url.URL) (CRL, error)
 		return nil, fmt.Errorf("failed parsing CRL from %q: %w", url, err)
 	}
 
-	return crlutil.NewCRL(crl)
+	return x509util.NewCRL(crl)
 }
 
 // DownloadCRLSigner downloads the signer certificate for a CRL from the specified URL.
 func (d *downloader) DownloadCRLSigner(ctx context.Context, url *url.URL) (*x509.Certificate, error) {
-	ctx, cancel := utils.WithTimeout(ctx, d.timeout)
+	ctx, cancel := goutils.WithTimeout(ctx, d.timeout)
 	defer cancel()
 
 	certBytes, err := httputil.HttpGET(ctx, d.client, url.String())
@@ -85,7 +85,7 @@ func (d *downloader) DownloadCRLSigner(ctx context.Context, url *url.URL) (*x509
 
 // DownloadEKCertificate attempts to download the EK certificate from ekURL.
 func (d *downloader) DownloadEKCertificate(ctx context.Context, ekURL *url.URL) (*x509.Certificate, error) {
-	ctx, cancel := utils.WithTimeout(ctx, d.timeout)
+	ctx, cancel := goutils.WithTimeout(ctx, d.timeout)
 	defer cancel()
 
 	body, err := httputil.HttpGET(ctx, d.client, ekURL.String())

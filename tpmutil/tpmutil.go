@@ -20,8 +20,8 @@ import (
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 	tpmkit "github.com/loicsikidi/go-tpm-kit"
-	"github.com/loicsikidi/go-tpm-kit/internal/utils"
 	"github.com/loicsikidi/go-tpm-kit/tpmcrypto"
+	goutils "github.com/loicsikidi/go-utils"
 )
 
 var (
@@ -82,7 +82,7 @@ const (
 //
 // Note: If cfg is nil, default configuration is used.
 func NVRead(t transport.TPM, optionalCfg ...NVReadConfig) ([]byte, error) {
-	cfg := utils.OptionalArg(optionalCfg)
+	cfg := goutils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, err
 	}
@@ -205,7 +205,7 @@ func nvReadSingleIndex(t transport.TPM, hierarchy, index tpm2.TPMHandle, auth tp
 //
 // Note: If cfg is nil, default configuration is used.
 func NVWrite(t transport.TPM, optionalCfg ...NVWriteConfig) error {
-	cfg := utils.OptionalArg(optionalCfg)
+	cfg := goutils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return err
 	}
@@ -314,7 +314,7 @@ type HashResult struct {
 //	}
 //	fmt.Printf("Digest: %x\n", result.Digest)
 func Hash(t transport.TPM, optionalCfg ...HashConfig) (*HashResult, error) {
-	cfg := utils.OptionalArg(optionalCfg)
+	cfg := goutils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, err
 	}
@@ -410,7 +410,7 @@ func hash(t transport.TPM, hierarchy tpm2.TPMHandle, blockSize int, data []byte,
 //
 // Note: If cfg is nil, default configuration is used.
 func Hmac(t transport.TPM, optionalCfg ...HmacConfig) ([]byte, error) {
-	cfg := utils.OptionalArg(optionalCfg)
+	cfg := goutils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, err
 	}
@@ -492,7 +492,7 @@ func hmac(t transport.TPM, keyHandle Handle, auth tpm2.Session, blockSize int, d
 //	}
 //	fmt.Printf("Signature: %x\n", signature)
 func Sign(t transport.TPM, optionalCfg ...SignConfig) ([]byte, error) {
-	cfg := utils.OptionalArg(optionalCfg)
+	cfg := goutils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, err
 	}
@@ -577,7 +577,7 @@ func formatRSASignature(sig tpm2.TPMTSignature, alg tpm2.TPMAlgID) ([]byte, erro
 //	}
 //	fmt.Printf("Key handle: 0x%x\n", handle.Handle())
 func GetPersistedKeyHandle(t transport.TPM, optionalCfg ...GetPersistedKeyHandleConfig) (HandleCloser, error) {
-	cfg := utils.OptionalArg(optionalCfg)
+	cfg := goutils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, err
 	}
@@ -624,7 +624,7 @@ func GetPersistedKeyHandle(t transport.TPM, optionalCfg ...GetPersistedKeyHandle
 //
 // Note: If cfg is nil, default configuration is used.
 func GetSRKHandle(t transport.TPM, optionalCfg ...ParentConfig) (Handle, error) {
-	cfg := utils.OptionalArg(optionalCfg)
+	cfg := goutils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, err
 	}
@@ -688,7 +688,7 @@ func GetSRKHandle(t transport.TPM, optionalCfg ...ParentConfig) (Handle, error) 
 //
 // Note: If cfg is nil, default configuration is used (RSA EK at handle 0x81010001).
 func GetEKHandle(t transport.TPM, optionalCfg ...EKParentConfig) (Handle, error) {
-	cfg := utils.OptionalArg(optionalCfg)
+	cfg := goutils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, err
 	}
@@ -746,7 +746,7 @@ func getEKTemplate(keyType KeyType, isLowRange bool) (tpm2.TPMTPublic, error) {
 //
 // Note: If cfg is nil, default configuration is used.
 func PersistEK(t transport.TPM, optionalCfg ...EKParentConfig) (Handle, error) {
-	cfg := utils.OptionalArg(optionalCfg)
+	cfg := goutils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, err
 	}
@@ -822,7 +822,7 @@ func PersistEK(t transport.TPM, optionalCfg ...EKParentConfig) (Handle, error) {
 //
 // Note: If cfg is nil, default configuration is used.
 func Persist(t transport.TPM, optionalCfg ...PersistConfig) (Handle, error) {
-	cfg := utils.OptionalArg(optionalCfg)
+	cfg := goutils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, err
 	}
@@ -929,7 +929,7 @@ func CreatePrimary(t transport.TPM, optionalCfg ...CreatePrimaryConfig) (HandleC
 //
 // Note: If cfg is nil, default configuration is used.
 func CreatePrimaryWithResult(t transport.TPM, optionalCfg ...CreatePrimaryConfig) (*CreatePrimaryResult, func() error, error) {
-	cfg := utils.OptionalArg(optionalCfg)
+	cfg := goutils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, nil, err
 	}
@@ -974,7 +974,7 @@ func CreatePrimaryWithResult(t transport.TPM, optionalCfg ...CreatePrimaryConfig
 //
 // Note: If cfg is nil, default configuration is used.
 func Load(t transport.TPM, optionalCfg ...LoadConfig) (HandleCloser, error) {
-	cfg := utils.OptionalArg(optionalCfg)
+	cfg := goutils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, err
 	}
@@ -1030,7 +1030,7 @@ func Load(t transport.TPM, optionalCfg ...LoadConfig) (HandleCloser, error) {
 //
 // Note: If cfg is nil, default configuration is used.
 func Create(t transport.TPM, optionalCfg ...CreateConfig) (HandleCloser, error) {
-	cfg := utils.OptionalArg(optionalCfg) // cfg will be checked in CreateWithResult
+	cfg := goutils.OptionalArg(optionalCfg) // cfg will be checked in CreateWithResult
 
 	result, err := CreateWithResult(t, cfg)
 	if err != nil {
@@ -1088,7 +1088,7 @@ func Create(t transport.TPM, optionalCfg ...CreateConfig) (HandleCloser, error) 
 //
 // Note: If cfg is nil, default configuration is used.
 func CreateWithResult(t transport.TPM, optionalCfg ...CreateConfig) (*CreateResult, error) {
-	cfg := utils.OptionalArg(optionalCfg)
+	cfg := goutils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, err
 	}
@@ -1187,7 +1187,7 @@ func MustGenerateRnd(size int) []byte {
 //
 // Note: If cfg is nil, default configuration is used.
 func SymEncryptDecrypt(t transport.TPM, optionalCfg ...SymEncryptDecryptConfig) ([]byte, error) {
-	cfg := utils.OptionalArg(optionalCfg)
+	cfg := goutils.OptionalArg(optionalCfg)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, err
 	}
