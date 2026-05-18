@@ -198,7 +198,7 @@ func (c *OpenConfig) CheckAndSetDefaults() error {
 //	tpm := tpmtest.OpenSimulator(t, tpmtest.OpenConfig{
 //	    SkipProvisioning: true,
 //	})
-func OpenSimulator(t *testing.T, optionalCfg ...OpenConfig) transport.TPM {
+func OpenSimulator(t *testing.T, optionalCfg ...OpenConfig) transport.TPMCloser {
 	t.Helper()
 
 	tpm, err := simulator.OpenSimulator()
