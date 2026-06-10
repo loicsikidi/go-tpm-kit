@@ -492,6 +492,69 @@ func TestGetSigSchemeFromPublicKey(t *testing.T) {
 			t.Error("GetSigSchemeFromPublicKey() expected error for unsupported key type")
 		}
 	})
+
+	t.Run("RSA key with nil opts", func(t *testing.T) {
+		rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			t.Fatalf("failed to generate RSA key: %v", err)
+		}
+
+		_, err = GetSigSchemeFromPublicKey(&rsaKey.PublicKey, nil)
+		if err == nil {
+			t.Error("GetSigSchemeFromPublicKey() expected error for RSA key with nil opts")
+		}
+	})
+
+	t.Run("ECDSA P-256 with nil opts", func(t *testing.T) {
+		eccKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			t.Fatalf("failed to generate ECDSA key: %v", err)
+		}
+
+		scheme, err := GetSigSchemeFromPublicKey(&eccKey.PublicKey, nil)
+		if err != nil {
+			t.Fatalf("GetSigSchemeFromPublicKey() error = %v", err)
+		}
+
+		if scheme.Scheme != tpm2.TPMAlgECDSA {
+			t.Errorf("GetSigSchemeFromPublicKey() scheme = %v, want %v", scheme.Scheme, tpm2.TPMAlgECDSA)
+		}
+
+		ecdsaScheme, err := scheme.Details.ECDSA()
+		if err != nil {
+			t.Fatalf("failed to get ECDSA scheme: %v", err)
+		}
+
+		if ecdsaScheme.HashAlg != tpm2.TPMAlgSHA256 {
+			t.Errorf("ECDSA hash = %v, want %v", ecdsaScheme.HashAlg, tpm2.TPMAlgSHA256)
+		}
+	})
+
+	t.Run("ECDSA P-256 with hash(0)", func(t *testing.T) {
+		eccKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			t.Fatalf("failed to generate ECDSA key: %v", err)
+		}
+
+		scheme, err := GetSigSchemeFromPublicKey(&eccKey.PublicKey, crypto.Hash(0))
+		if err != nil {
+			t.Fatalf("GetSigSchemeFromPublicKey() error = %v", err)
+		}
+
+		if scheme.Scheme != tpm2.TPMAlgECDSA {
+			t.Errorf("GetSigSchemeFromPublicKey() scheme = %v, want %v", scheme.Scheme, tpm2.TPMAlgECDSA)
+		}
+
+		ecdsaScheme, err := scheme.Details.ECDSA()
+		if err != nil {
+			t.Fatalf("failed to get ECDSA scheme: %v", err)
+		}
+
+		if ecdsaScheme.HashAlg != tpm2.TPMAlgSHA256 {
+			t.Errorf("ECDSA hash = %v, want %v", ecdsaScheme.HashAlg, tpm2.TPMAlgSHA256)
+		}
+	})
+
 }
 
 func TestGetSigHashFromPublic(t *testing.T) {
