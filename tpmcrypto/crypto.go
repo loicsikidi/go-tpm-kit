@@ -8,6 +8,7 @@ package tpmcrypto
 import (
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rsa"
 	"errors"
 	"fmt"
@@ -296,11 +297,10 @@ func GetSigSchemeFromPublic(public tpm2.TPMTPublic) (tpm2.TPMTSigScheme, error) 
 // This is useful for agnostic key (scheme = TPMAlgNull) which is not limited to
 // a specific signature scheme.
 func GetSigSchemeFromPublicKey(pub crypto.PublicKey, opts crypto.SignerOpts) (tpm2.TPMTSigScheme, error) {
-	alg, err := HashToAlgorithm(opts.HashFunc())
+	alg, err := getHashAlg(pub, opts)
 	if err != nil {
 		return tpm2.TPMTSigScheme{}, err
 	}
-
 	switch pub.(type) {
 	case *ecdsa.PublicKey:
 		return GetSigScheme(tpm2.TPMAlgECDSA, alg), nil
@@ -309,6 +309,30 @@ func GetSigSchemeFromPublicKey(pub crypto.PublicKey, opts crypto.SignerOpts) (tp
 	default:
 		return tpm2.TPMTSigScheme{}, fmt.Errorf("unsupported public key type: %T", pub)
 	}
+}
+
+func getHashAlg(pub crypto.PublicKey, opts crypto.SignerOpts) (tpm2.TPMAlgID, error) {
+	if opts == nil || opts.HashFunc() == crypto.Hash(0) {
+		var alg tpm2.TPMAlgID
+		switch key := pub.(type) {
+		case *ecdsa.PublicKey:
+			// fallback to NIST recommandation
+			switch key.Curve {
+			case elliptic.P256():
+				alg = tpm2.TPMAlgSHA256
+			case elliptic.P384():
+				alg = tpm2.TPMAlgSHA384
+			case elliptic.P521():
+				alg = tpm2.TPMAlgSHA512
+			default:
+				return alg, fmt.Errorf("unsupported curve: %T", key.Curve)
+			}
+			return alg, nil
+		default:
+			return alg, fmt.Errorf("invalid signer options")
+		}
+	}
+	return HashToAlgorithm(opts.HashFunc())
 }
 
 // GetSigScheme creates a [tpm2.TPMTSigScheme] structure based on the provided
