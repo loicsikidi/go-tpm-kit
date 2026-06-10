@@ -301,6 +301,7 @@ func GetSigSchemeFromPublicKey(pub crypto.PublicKey, opts crypto.SignerOpts) (tp
 	if err != nil {
 		return tpm2.TPMTSigScheme{}, err
 	}
+
 	switch pub.(type) {
 	case *ecdsa.PublicKey:
 		return GetSigScheme(tpm2.TPMAlgECDSA, alg), nil
