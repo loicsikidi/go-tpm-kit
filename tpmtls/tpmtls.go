@@ -202,7 +202,7 @@ func New(cfg Config) (*Signer, error) {
 		}
 		k.cert, err = x509.ParseCertificate(certDER)
 		if err != nil {
-			k.handle.Close()
+			k.handle.Close() //nolint:errcheck
 			return nil, fmt.Errorf("failed to parse certificate: %w", err)
 		}
 	}
@@ -217,12 +217,12 @@ func New(cfg Config) (*Signer, error) {
 			MultiIndex: true,
 		})
 		if err != nil {
-			k.handle.Close()
+			k.handle.Close() //nolint:errcheck
 			return nil, fmt.Errorf("failed to read certificate chain from NV: %w", err)
 		}
 		k.chain, err = x509.ParseCertificates(chainDER)
 		if err != nil {
-			k.handle.Close()
+			k.handle.Close() //nolint:errcheck
 			return nil, fmt.Errorf("failed to parse certificate chain: %w", err)
 		}
 	}
