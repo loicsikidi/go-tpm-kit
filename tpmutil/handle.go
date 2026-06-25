@@ -112,52 +112,52 @@ type PublicGetter interface {
 	HasPublic() bool
 }
 
-// tpmHandle is an implementation of the HandleCloser interface.
-// It wraps a TPM handle and provides methods to interact with it.
+// simpleHandle is an implementation of [Handle] interface.
+type simpleHandle struct {
+	handle
+	isAuth bool
+	public *tpm2.TPMTPublic
+}
+
+var _ Handle = (*simpleHandle)(nil)
+var _ PublicGetter = (*simpleHandle)(nil)
+
+// Handle returns the underlying TPM handle value.
+func (h *simpleHandle) Handle() tpm2.TPMHandle {
+	return tpm2.TPMHandle(h.HandleValue())
+}
+
+// Name returns the TPM Name associated with the handle.
+func (h *simpleHandle) Name() tpm2.TPM2BName {
+	return *h.KnownName()
+}
+
+// IsAuth indicates if the handle is an authorization handle.
+func (h *simpleHandle) IsAuth() bool {
+	return h.isAuth
+}
+
+// Type returns the type of the handle.
+func (h *simpleHandle) Type() HandleType {
+	return identifyHandleType(h)
+}
+
+// Public returns the public area associated with the handle.
+func (h *simpleHandle) Public() *tpm2.TPMTPublic {
+	return h.public
+}
+
+// HasPublic indicates if the handle has an associated public area.
+func (h *simpleHandle) HasPublic() bool {
+	return h.public != nil
+}
+
+// tpmHandle is an implementation of the [HandleCloser] interface.
 type tpmHandle struct {
 	handle
 	tpm    transport.TPM
 	isAuth bool
 	public *tpm2.TPMTPublic
-}
-
-var _ HandleCloser = (*tpmHandle)(nil)
-var _ PublicGetter = (*tpmHandle)(nil)
-
-// NewHandle creates a new Handle from the given TPM handle.
-//
-// Examples:
-//
-//	// Create a handle from a Command Response
-//	h := &tpm2.NamedHandle{Handle: rsp.ObjectHandle, Name: rsp.Name}
-//	handle := tpmutil.NewHandle(h)
-//
-//	// Create a handle from a TPM persistent handle
-//	handle := tpmutil.NewHandle(tpm2.TPMHandle(0x81000001))
-//
-//	fmt.Printf("Handle type: %s\n", h.Type())
-//
-// Note: [tpm2.TPMHandle], [tpm2.AuthHandle] and [tpm2.NamedHandle] can be used as input.
-func NewHandle(h handle) Handle {
-	return &tpmHandle{handle: h, isAuth: isAuthHandle(h)}
-}
-
-// NewHandleCloser creates a new HandleCloser from the given TPM handle.
-// The returned handle can be closed to flush the TPM resource.
-//
-// Example:
-//
-//	// Create a closable handle for a transient key
-//	keyHandle := tpmutil.NewHandleCloser(tpm, &tpm2.NamedHandle{
-//		Handle: createRsp.ObjectHandle,
-//		Name:   createRsp.Name,
-//	})
-//	defer keyHandle.Close()
-//	// Use keyHandle for TPM operations
-//
-// Note: [tpm2.TPMHandle], [tpm2.AuthHandle] and [tpm2.NamedHandle] can be used as input.
-func NewHandleCloser(tpm transport.TPM, h handle) HandleCloser {
-	return &tpmHandle{handle: h, tpm: tpm, isAuth: isAuthHandle(h)}
 }
 
 // Handle returns the underlying TPM handle value.
@@ -196,7 +196,7 @@ func (h *tpmHandle) Close() error {
 		return ErrMissingTpm
 	}
 
-	// Flush the handle if it is a transient handle.
+	// Only a transient handle is expected to be flushed
 	if h.Type() == TransientHandle {
 		_, err := tpm2.FlushContext{
 			FlushHandle: h.handle,
@@ -218,6 +218,45 @@ func (h *tpmHandle) toAuthHandle() tpm2.AuthHandle {
 		Name:   h.Name(),
 		Auth:   NoAuth,
 	}
+}
+
+var _ HandleCloser = (*tpmHandle)(nil)
+var _ PublicGetter = (*tpmHandle)(nil)
+
+// NewHandle creates a new Handle from the given TPM handle.
+//
+// Examples:
+//
+//	// Create a handle from a Command Response
+//	h := &tpm2.NamedHandle{Handle: rsp.ObjectHandle, Name: rsp.Name}
+//	handle := tpmutil.NewHandle(h)
+//
+//	// Create a handle from a TPM persistent handle
+//	handle := tpmutil.NewHandle(tpm2.TPMHandle(0x81000001))
+//
+//	fmt.Printf("Handle type: %s\n", h.Type())
+//
+// Note: [tpm2.TPMHandle], [tpm2.AuthHandle] and [tpm2.NamedHandle] can be used as input.
+func NewHandle(h handle) Handle {
+	return &simpleHandle{handle: h, isAuth: isAuthHandle(h)}
+}
+
+// NewHandleCloser creates a new HandleCloser from the given TPM handle.
+// The returned handle can be closed to flush the TPM resource.
+//
+// Example:
+//
+//	// Create a closable handle for a transient key
+//	keyHandle := tpmutil.NewHandleCloser(tpm, &tpm2.NamedHandle{
+//		Handle: createRsp.ObjectHandle,
+//		Name:   createRsp.Name,
+//	})
+//	defer keyHandle.Close()
+//	// Use keyHandle for TPM operations
+//
+// Note: [tpm2.TPMHandle], [tpm2.AuthHandle] and [tpm2.NamedHandle] can be used as input.
+func NewHandleCloser(tpm transport.TPM, h handle) HandleCloser {
+	return &tpmHandle{handle: h, tpm: tpm, isAuth: isAuthHandle(h)}
 }
 
 // IsHandleOfType checks if the given handle is of the specified type.
@@ -252,9 +291,8 @@ func ToHandle(t transport.TPM, handle any) (Handle, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &tpmHandle{
+		return &simpleHandle{
 			handle: &tpm2.NamedHandle{Handle: h, Name: pa.Name},
-			tpm:    t,
 			public: pa.public,
 		}, nil
 	case Handle:
@@ -294,28 +332,15 @@ func ToHandleCloser(t transport.TPM, handle any) (HandleCloser, error) {
 			return nil, err
 		}
 		return ToHandleCloser(t, hh)
-	case HandleCloser:
-		tpmh, ok := h.(*tpmHandle)
-		if !ok {
-			return h, nil
-		}
-		if !tpmh.HasPublic() {
-			pa, err := getPublicArea(t, tpmh)
-			if err != nil {
-				return nil, err
-			}
-			tpmh.public = pa.public
-		}
-		return h, nil
 	case Handle:
-		pa, err := getPublicArea(t, h)
+		public, err := getPublic(t, h)
 		if err != nil {
 			return nil, err
 		}
 		return &tpmHandle{
 			handle: h,
 			tpm:    t,
-			public: pa.public,
+			public: public,
 		}, nil
 	default:
 		return nil, fmt.Errorf("expected tpm2.TPMHandle or a struct implementing tpmutil.Handle/tpmutil.HandleCloser, got %T", h)
