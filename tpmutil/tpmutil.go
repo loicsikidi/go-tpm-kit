@@ -103,7 +103,9 @@ func NVRead(t transport.TPM, optionalCfg ...NVReadConfig) ([]byte, error) {
 //	}
 //	fmt.Printf("Certificate subject: %s\n", cert.Subject)
 func NVReadCertificate(t transport.TPM, optionalCfg ...NVReadConfig) (*x509.Certificate, error) {
-	data, err := NVRead(t, optionalCfg...)
+	cfg := goutils.OptionalArg(optionalCfg)
+	cfg.MultiIndex = true
+	data, err := NVRead(t, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -145,6 +147,9 @@ func NVReadCertificates(t transport.TPM, optionalCfg ...NVReadConfig) ([]*x509.C
 //		log.Fatal(err)
 //	}
 func NVWriteCertificate(t transport.TPM, cert *x509.Certificate, optionalCfg ...NVWriteConfig) error {
+	if cert == nil {
+		return ErrMissingCert
+	}
 	cfg := goutils.OptionalArg(optionalCfg)
 	cfg.Data = cert.Raw
 	return NVWrite(t, cfg)
@@ -1103,6 +1108,8 @@ func Load(t transport.TPM, optionalCfg ...LoadConfig) (HandleCloser, error) {
 // If [CreateConfig.PersistConfig] is set, the created key will be automatically
 // persisted to the specified persistent handle. In this case, the returned handle
 // will be a persistent handle.
+// WARNING: when [CreateConfig.PersistConfig] is used, [CreateConfig.SkipFlush] is
+// ignored and will always flush the transient handle.
 //
 // Example:
 //

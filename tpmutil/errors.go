@@ -22,6 +22,7 @@ var (
 	ErrMissingPublicKey = errors.New("publicKey is required")
 	ErrMissingIndex     = errors.New("index is required")
 	ErrTooManyIndices   = errors.New("data size exceeds maximum number of NV indices (256)")
+	ErrMissingCert      = errors.New("certificate is required")
 	ErrNoCertificates   = errors.New("at least one certificate is required")
 )
 

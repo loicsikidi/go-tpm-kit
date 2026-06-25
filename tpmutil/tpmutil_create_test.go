@@ -346,6 +346,10 @@ func TestCreate(t *testing.T) {
 			t.Errorf("Expected handle type Persistent, got %s", keyHandle.Type())
 		}
 
+		if keyHandle.Handle() != persistentHandle.Handle() {
+			t.Fatalf("Expected persistent handle 0x%x, got 0x%x", persistentHandle.Handle(), keyHandle.Handle())
+		}
+
 		// Verify the key is actually persisted
 		_, err = tpm2.ReadPublic{
 			ObjectHandle: keyHandle.Handle(),
