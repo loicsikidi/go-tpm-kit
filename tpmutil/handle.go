@@ -340,10 +340,11 @@ func ToHandleCloser(t transport.TPM, handle any) (HandleCloser, error) {
 		return &tpmHandle{
 			handle: h,
 			tpm:    t,
+			isAuth: h.IsAuth(),
 			public: public,
 		}, nil
 	default:
-		return nil, fmt.Errorf("expected tpm2.TPMHandle or a struct implementing tpmutil.Handle/tpmutil.HandleCloser, got %T", h)
+		return nil, fmt.Errorf("expected tpm2.TPMHandle or a struct implementing tpmutil.Handle, got %T", h)
 	}
 }
 
