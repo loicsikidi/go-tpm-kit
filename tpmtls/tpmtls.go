@@ -118,8 +118,9 @@ func (c *Config) CheckAndSetDefaults() error {
 	if c.Handle == nil && c.Key == nil {
 		return fmt.Errorf("bad parameter: either Handle or Key must be set")
 	}
-	if c.Handle != nil && c.Handle.Type() != tpmutil.PersistentHandle {
-		return fmt.Errorf("bad parameter: Handle must be persistent")
+	// users should use persistent handle but transient handle can be useful for testing
+	if c.Handle != nil && !slices.Contains([]tpmutil.HandleType{tpmutil.PersistentHandle, tpmutil.TransientHandle}, c.Handle.Type()) {
+		return fmt.Errorf("bad parameter: Handle must be persistent or transient")
 	}
 
 	if c.Cert != nil && c.CertNVIndex != nil {
@@ -216,7 +217,7 @@ func New(cfg Config) (*Signer, error) {
 		}
 	}
 
-	if err := s.check(); err != nil {
+	if err := s.checkTPMKey(); err != nil {
 		return nil, err
 	}
 
@@ -238,7 +239,8 @@ func New(cfg Config) (*Signer, error) {
 	return s, nil
 }
 
-func (s *Signer) check() error {
+// checkTPMKey ensures that the TPM backed key is safe to use
+func (s *Signer) checkTPMKey() error {
 	if !x509util.MatchPublicKey(s.cert, s.publicKey) {
 		return fmt.Errorf("key mismatch between TPM key and the certificate")
 	}
