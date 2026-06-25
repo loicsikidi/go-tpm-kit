@@ -8,14 +8,15 @@ package tpmtls
 import (
 	"crypto"
 	"crypto/x509"
-	"errors"
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 	"github.com/loicsikidi/go-tpm-kit/tpmcrypto"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
+	"github.com/loicsikidi/go-utils/crypto/x509util"
 )
 
 // Algorithm represents the key algorithm type.
@@ -45,10 +46,10 @@ type Blob struct {
 // CheckAndSetDefaults validates Blob fields.
 func (b *Blob) CheckAndSetDefaults() error {
 	if len(b.Public) == 0 {
-		return errors.New("bad parameter: Public is required")
+		return fmt.Errorf("bad parameter: Public is required")
 	}
 	if len(b.Private) == 0 {
-		return errors.New("bad parameter: Private is required")
+		return fmt.Errorf("bad parameter: Private is required")
 	}
 	return nil
 }
@@ -64,7 +65,7 @@ type TransientKey struct {
 // CheckAndSetDefaults validates TransientKey fields.
 func (e *TransientKey) CheckAndSetDefaults() error {
 	if e.Blob == nil {
-		return errors.New("bad parameter: Blob is required")
+		return fmt.Errorf("bad parameter: Blob is required")
 	}
 	if err := e.Blob.CheckAndSetDefaults(); err != nil {
 		return err
@@ -108,25 +109,38 @@ type Config struct {
 // CheckAndSetDefaults validates and sets default values for Config.
 func (c *Config) CheckAndSetDefaults() error {
 	if c.TPM == nil {
-		return errors.New("bad parameter: TPM is required")
+		return fmt.Errorf("bad parameter: TPM is required")
 	}
 
 	if c.Handle != nil && c.Key != nil {
-		return errors.New("bad parameter: Handle and Key are mutually exclusive")
+		return fmt.Errorf("bad parameter: Handle and Key are mutually exclusive")
 	}
 	if c.Handle == nil && c.Key == nil {
-		return errors.New("bad parameter: either Handle or Key must be set")
+		return fmt.Errorf("bad parameter: either Handle or Key must be set")
+	}
+	if c.Handle != nil && c.Handle.Type() != tpmutil.PersistentHandle {
+		return fmt.Errorf("bad parameter: Handle must be persistent")
 	}
 
 	if c.Cert != nil && c.CertNVIndex != nil {
-		return errors.New("bad parameter: Cert and CertNVIndex are mutually exclusive")
+		return fmt.Errorf("bad parameter: Cert and CertNVIndex are mutually exclusive")
 	}
 	if c.Cert == nil && c.CertNVIndex == nil {
-		return errors.New("bad parameter: either Cert or CertNVIndex must be set")
+		return fmt.Errorf("bad parameter: either Cert or CertNVIndex must be set")
 	}
 
 	if c.Chain != nil && c.CertChainNVIndexStart != nil {
-		return errors.New("bad parameter: Chain and CertChainNVIndexStart are mutually exclusive")
+		return fmt.Errorf("bad parameter: Chain and CertChainNVIndexStart are mutually exclusive")
+	}
+
+	if c.Chain != nil {
+		// let's be defensive here
+		for i, cert := range c.Chain {
+			if cert == nil {
+				return fmt.Errorf("bad parameter: Chain[%d] is nil", i)
+			}
+		}
+		c.Chain = slices.Clone(c.Chain)
 	}
 
 	if c.Key != nil {
@@ -160,74 +174,90 @@ func New(cfg Config) (*Signer, error) {
 		return nil, err
 	}
 
-	k := &Signer{
+	s := &Signer{
 		tpm: cfg.TPM,
 	}
 
 	var err error
 	if cfg.Handle != nil {
 		// Persistent key
-		k.handle, err = tpmutil.ToHandleCloser(cfg.TPM, cfg.Handle)
+		s.handle, err = tpmutil.ToHandleCloser(cfg.TPM, cfg.Handle)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get persistent key handle: %w", err)
 		}
 	} else {
 		// Transient key
-		k.handle, err = k.loadTransientKey(cfg)
+		s.handle, err = s.loadTransientKey(cfg)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	if !k.handle.HasPublic() {
-		k.handle.Close() //nolint:errcheck
-		return nil, errors.New("handle does not have public key")
+	if !s.handle.HasPublic() {
+		s.handle.Close() //nolint:errcheck
+		return nil, fmt.Errorf("handle does not have public key")
 	}
-	k.publicKey, err = tpmcrypto.PublicKey(k.handle.Public())
+	s.publicKey, err = tpmcrypto.PublicKey(s.handle.Public())
 	if err != nil {
-		k.handle.Close() //nolint:errcheck
+		s.handle.Close() //nolint:errcheck
 		return nil, fmt.Errorf("failed to extract public key: %w", err)
 	}
 
 	if cfg.Cert != nil {
-		k.cert = cfg.Cert
+		s.cert = cfg.Cert
 	} else {
-		certDER, err := tpmutil.NVRead(cfg.TPM, tpmutil.NVReadConfig{
+		s.cert, err = tpmutil.NVReadCertificate(cfg.TPM, tpmutil.NVReadConfig{
 			Index:      cfg.CertNVIndex.Handle(),
-			MultiIndex: false,
+			MultiIndex: true, // we might have a huge certificate
 		})
 		if err != nil {
-			k.handle.Close() //nolint:errcheck
+			s.handle.Close() //nolint:errcheck
 			return nil, fmt.Errorf("failed to read certificate from NV: %w", err)
 		}
-		k.cert, err = x509.ParseCertificate(certDER)
-		if err != nil {
-			k.handle.Close() //nolint:errcheck
-			return nil, fmt.Errorf("failed to parse certificate: %w", err)
-		}
+	}
+
+	if err := s.check(); err != nil {
+		return nil, err
 	}
 
 	// Load certificate chain (optional)
 	if cfg.Chain != nil {
-		k.chain = cfg.Chain
+		s.chain = cfg.Chain
 	}
 	if cfg.CertChainNVIndexStart != nil {
-		chainDER, err := tpmutil.NVRead(cfg.TPM, tpmutil.NVReadConfig{
+		s.chain, err = tpmutil.NVReadCertificates(cfg.TPM, tpmutil.NVReadConfig{
 			Index:      cfg.CertChainNVIndexStart.Handle(),
 			MultiIndex: true,
 		})
 		if err != nil {
-			k.handle.Close() //nolint:errcheck
+			s.handle.Close() //nolint:errcheck
 			return nil, fmt.Errorf("failed to read certificate chain from NV: %w", err)
-		}
-		k.chain, err = x509.ParseCertificates(chainDER)
-		if err != nil {
-			k.handle.Close() //nolint:errcheck
-			return nil, fmt.Errorf("failed to parse certificate chain: %w", err)
 		}
 	}
 
-	return k, nil
+	return s, nil
+}
+
+func (s *Signer) check() error {
+	if !x509util.MatchPublicKey(s.cert, s.publicKey) {
+		return fmt.Errorf("key mismatch between TPM key and the certificate")
+	}
+
+	pub := s.handle.Public()
+	if !pub.ObjectAttributes.FixedParent || !pub.ObjectAttributes.SensitiveDataOrigin {
+		return fmt.Errorf("provided key is not a secure TPM key")
+	}
+
+	if !pub.ObjectAttributes.SignEncrypt {
+		return fmt.Errorf("provided key is not a signing key")
+	}
+
+	// TODO: support restricted signing key
+	if pub.ObjectAttributes.Restricted {
+		return fmt.Errorf("provided key is a restricted key")
+	}
+
+	return nil
 }
 
 // loadTransientKey loads a transient key from a TransientKey blob.

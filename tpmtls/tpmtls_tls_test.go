@@ -15,6 +15,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/google/go-tpm/tpm2"
 	"github.com/loicsikidi/go-tpm-kit/tpmtest"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 	"github.com/loicsikidi/go-utils/crypto/pkiutil/tinyca"
@@ -54,6 +55,9 @@ func TestMutualTLS(t *testing.T) {
 			keyHandle, err := tpmutil.Create(tpm, tpmutil.CreateConfig{
 				ParentHandle: srk,
 				InPublic:     template,
+				PersistConfig: &tpmutil.PersistConfig{
+					PersistentHandle: tpmutil.NewHandle(tpm2.TPMHandle(0x81000100)),
+				},
 			})
 			if err != nil {
 				t.Fatalf("Create failed: %v", err)
@@ -107,8 +111,11 @@ func createMTLSServer(t *testing.T, ca *tinyca.CA) *httptest.Server {
 	t.Helper()
 
 	serverCert, serverKey, err := ca.Generate(tinyca.CertificateRequest{
-		Subject:     pkix.Name{CommonName: "test-server"},
-		IPAddresses: []net.IP{net.IPv4(127, 0, 0, 1)},
+		Subject: pkix.Name{CommonName: "test-server"},
+		IPAddresses: []net.IP{
+			net.IPv4(127, 0, 0, 1),
+			net.IPv6loopback,
+		},
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	})
 	if err != nil {

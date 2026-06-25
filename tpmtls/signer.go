@@ -64,9 +64,11 @@ func (s *Signer) Close() error {
 	defer s.mu.Unlock()
 
 	if s.handle != nil {
-		err := s.handle.Close()
+		if err := s.handle.Close(); err != nil {
+			return err
+		}
 		s.handle = nil // Prevent double-close
-		return err
+		return nil
 	}
 	return nil
 }

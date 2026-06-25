@@ -43,8 +43,8 @@ func main() {
 	// Using persistent key and NV-stored certificate
 	signer, err := tpmtls.New(tpmtls.Config{
 		TPM:         tpm,
-		Handle:      tpmutil.Handle(0x81000001),
-		CertNVIndex: tpmutil.Handle(0x1500000),
+		Handle:      tpmutil.NewHandle(tpmutil.Handle(0x81000001)),
+		CertNVIndex: tpmutil.NewHandle(tpmutil.Handle(0x1500000)),
 	})
 	if err != nil {
 		panic(err)

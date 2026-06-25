@@ -40,18 +40,12 @@ func TestNewKey_PersistentKey_RSA(t *testing.T) {
 	keyHandle, err := tpmutil.Create(tpm, tpmutil.CreateConfig{
 		ParentHandle: srk,
 		InPublic:     template,
+		PersistConfig: &tpmutil.PersistConfig{
+			PersistentHandle: tpmutil.NewHandle(tpm2.TPMHandle(0x81000100)),
+		},
 	})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
-	}
-	defer keyHandle.Close()
-
-	persistedHandle, err := tpmutil.Persist(tpm, tpmutil.PersistConfig{
-		TransientHandle:  keyHandle,
-		PersistentHandle: tpmutil.NewHandle(tpm2.TPMHandle(0x81000100)),
-	})
-	if err != nil {
-		t.Fatalf("Persist failed: %v", err)
 	}
 
 	ca := tinyca.Must()
@@ -59,7 +53,7 @@ func TestNewKey_PersistentKey_RSA(t *testing.T) {
 
 	signer, err := New(Config{
 		TPM:    tpm,
-		Handle: persistedHandle,
+		Handle: keyHandle,
 		Cert:   cert,
 	})
 	if err != nil {
@@ -155,11 +149,13 @@ func TestNewKey_CertFromNV(t *testing.T) {
 	keyHandle, err := tpmutil.Create(tpm, tpmutil.CreateConfig{
 		ParentHandle: srk,
 		InPublic:     template,
+		PersistConfig: &tpmutil.PersistConfig{
+			PersistentHandle: tpmutil.NewHandle(tpm2.TPMHandle(0x81000100)),
+		},
 	})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	defer keyHandle.Close()
 
 	ca := tinyca.Must()
 	cert := createCertificateWithTPMKey(t, ca, tpm, keyHandle)
@@ -211,11 +207,13 @@ func TestSign_Concurrent(t *testing.T) {
 	keyHandle, err := tpmutil.Create(tpm, tpmutil.CreateConfig{
 		ParentHandle: srk,
 		InPublic:     template,
+		PersistConfig: &tpmutil.PersistConfig{
+			PersistentHandle: tpmutil.NewHandle(tpm2.TPMHandle(0x81000100)),
+		},
 	})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	defer keyHandle.Close()
 
 	ca := tinyca.Must()
 	cert := createCertificateWithTPMKey(t, ca, tpm, keyHandle)
@@ -263,6 +261,9 @@ func TestClose_Idempotent(t *testing.T) {
 	keyHandle, err := tpmutil.Create(tpm, tpmutil.CreateConfig{
 		ParentHandle: srk,
 		InPublic:     template,
+		PersistConfig: &tpmutil.PersistConfig{
+			PersistentHandle: tpmutil.NewHandle(tpm2.TPMHandle(0x81000100)),
+		},
 	})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
@@ -362,6 +363,58 @@ func TestConfig_Validation(t *testing.T) {
 				t.Fatalf("Expected error %q, got %q", tt.wantErr, err.Error())
 			}
 		})
+	}
+}
+
+func TestNewKey_KeyMismatch(t *testing.T) {
+	tpm := tpmtest.OpenSimulator(t)
+
+	srk, err := tpmutil.GetSRKHandle(tpm)
+	if err != nil {
+		t.Fatalf("GetSRKHandle failed: %v", err)
+	}
+
+	template := tpmutil.MustApplicationKeyTemplate(tpmutil.KeyConfig{
+		KeyType: tpmutil.ECCNISTP256,
+	})
+	keyHandle, err := tpmutil.Create(tpm, tpmutil.CreateConfig{
+		ParentHandle: srk,
+		InPublic:     template,
+		PersistConfig: &tpmutil.PersistConfig{
+			PersistentHandle: tpmutil.NewHandle(tpm2.TPMHandle(0x81000100)),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	ca := tinyca.Must()
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("GenerateKey failed: %v", err)
+	}
+
+	mismatchedCert, _, err := ca.Generate(tinyca.CertificateRequest{
+		Subject:     pkix.Name{CommonName: "mismatched-key"},
+		IPAddresses: []net.IP{net.IPv4(127, 0, 0, 1)},
+		Signer:      rsaKey,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	})
+	if err != nil {
+		t.Fatalf("Generate certificate failed: %v", err)
+	}
+
+	_, err = New(Config{
+		TPM:    tpm,
+		Handle: keyHandle,
+		Cert:   mismatchedCert,
+	})
+	if err == nil {
+		t.Fatal("Expected error for mismatched key, got nil")
+	}
+	expectedErr := "key mismatch between TPM key and the certificate"
+	if err.Error() != expectedErr {
+		t.Fatalf("Expected error %q, got %q", expectedErr, err.Error())
 	}
 }
 
