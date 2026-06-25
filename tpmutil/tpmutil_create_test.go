@@ -311,6 +311,54 @@ func TestCreate(t *testing.T) {
 		}
 		defer keyHandle.Close()
 	})
+
+	t.Run("with PersistConfig", func(t *testing.T) {
+		parentHandle, err := tpmutil.CreatePrimary(thetpm, tpmutil.CreatePrimaryConfig{
+			PrimaryHandle: tpm2.TPMRHOwner,
+			InPublic:      tpmutil.ECCSRKTemplate,
+		})
+		if err != nil {
+			t.Fatalf("CreatePrimary() failed: %v", err)
+		}
+		defer parentHandle.Close()
+
+		persistentHandle := tpmutil.NewHandle(tpm2.TPMHandle(0x81000200))
+
+		keyHandle, err := tpmutil.Create(thetpm, tpmutil.CreateConfig{
+			ParentHandle: parentHandle,
+			InPublic:     tpmutil.ECCSRKTemplate,
+			PersistConfig: &tpmutil.PersistConfig{
+				PersistentHandle: persistentHandle,
+			},
+		})
+		if err != nil {
+			t.Fatalf("Create() with PersistConfig failed: %v", err)
+		}
+		defer func() {
+			_, _ = tpm2.EvictControl{
+				Auth:             tpmutil.ToAuthHandle(tpmutil.NewHandle(tpm2.TPMRHOwner), tpmutil.NoAuth),
+				ObjectHandle:     keyHandle,
+				PersistentHandle: persistentHandle.Handle(),
+			}.Execute(thetpm)
+		}()
+
+		if keyHandle.Type() != tpmutil.PersistentHandle {
+			t.Errorf("Expected handle type Persistent, got %s", keyHandle.Type())
+		}
+
+		// Verify the key is actually persisted
+		_, err = tpm2.ReadPublic{
+			ObjectHandle: keyHandle.Handle(),
+		}.Execute(thetpm)
+		if err != nil {
+			t.Fatalf("ReadPublic() failed: %v", err)
+		}
+
+		public := keyHandle.Public()
+		if public.Type != tpm2.TPMAlgECC {
+			t.Errorf("Expected public type ECC, got %v", public.Type)
+		}
+	})
 }
 
 func TestCreateWithResult(t *testing.T) {

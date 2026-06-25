@@ -390,6 +390,16 @@ type CreateConfig struct {
 	//
 	// Default: nil.
 	SealingData []byte
+	// PersistConfig specifies the configuration for persisting the created key.
+	//
+	// When this field is set, [Create] will automatically persist the created
+	// transient key to the specified persistent handle after creation.
+	//
+	//
+	// Experimental: this field is experimental and may be removed in future versions.
+	//
+	// Default: nil (key is not persisted).
+	PersistConfig *PersistConfig
 }
 
 // CheckAndSetDefault validates and sets default values for CreateConfig.
