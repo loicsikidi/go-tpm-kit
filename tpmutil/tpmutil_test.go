@@ -631,6 +631,59 @@ func TestNVReadCertificate(t *testing.T) {
 	}
 }
 
+func TestNVReadCertificateFallback(t *testing.T) {
+	thetpm := testutil.OpenSimulator(t)
+
+	ca := tinyca.Must()
+
+	cert1, _, err := ca.Generate(tinyca.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Certificate 1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("ca.Generate() failed: %v", err)
+	}
+
+	cert2, _, err := ca.Generate(tinyca.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Certificate 2",
+		},
+	})
+	if err != nil {
+		t.Fatalf("ca.Generate() failed: %v", err)
+	}
+
+	baseIndex := tpm2.TPMHandle(0x01C00002)
+
+	err = tpmutil.NVWriteCertificate(thetpm, cert1, tpmutil.NVWriteConfig{
+		Index: baseIndex,
+	})
+	if err != nil {
+		t.Fatalf("NVWrite() for cert1 failed: %v", err)
+	}
+
+	secondIndex := tpm2.TPMHandle(uint32(baseIndex) + 1)
+	err = tpmutil.NVWriteCertificate(thetpm, cert2, tpmutil.NVWriteConfig{
+		Index: secondIndex,
+	})
+	if err != nil {
+		t.Fatalf("NVWrite() for cert2 failed: %v", err)
+	}
+
+	readCert, err := tpmutil.NVReadCertificate(thetpm, tpmutil.NVReadConfig{
+		Index: baseIndex,
+	})
+	if err != nil {
+		t.Fatalf("NVReadCertificate() failed: %v", err)
+	}
+
+	if !cert1.Equal(readCert) {
+		t.Errorf("certificate read should match cert1: expected subject=%s, got subject=%s",
+			cert1.Subject.CommonName, readCert.Subject.CommonName)
+	}
+}
+
 func TestNVReadCertificates(t *testing.T) {
 	index := tpm2.TPMHandle(0x01C00001)
 
