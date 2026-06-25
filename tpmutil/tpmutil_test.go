@@ -11,6 +11,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"fmt"
 	"reflect"
 	"testing"
@@ -21,6 +23,7 @@ import (
 	"github.com/loicsikidi/go-tpm-kit/internal/utils/testutil"
 	"github.com/loicsikidi/go-tpm-kit/tpmcrypto"
 	"github.com/loicsikidi/go-tpm-kit/tpmutil"
+	"github.com/loicsikidi/go-utils/crypto/pkiutil/tinyca"
 )
 
 var hmacKeyTemplate = tpm2.TPMTPublic{
@@ -587,6 +590,198 @@ func TestNVReadMultiIndex(t *testing.T) {
 				}
 				if _, err := undefine.Execute(thetpm); err != nil {
 					t.Logf("could not undefine NV index 0x%x: %v", currentIndex, err)
+				}
+			}
+		})
+	}
+}
+
+func TestNVReadCertificate(t *testing.T) {
+	thetpm := testutil.OpenSimulator(t)
+
+	ca := tinyca.Must()
+
+	cert, _, err := ca.Generate(tinyca.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Test Certificate",
+		},
+	})
+	if err != nil {
+		t.Fatalf("ca.Generate() failed: %v", err)
+	}
+
+	index := tpm2.TPMHandle(0x01C00001)
+
+	err = tpmutil.NVWriteCertificate(thetpm, cert, tpmutil.NVWriteConfig{
+		Index: index,
+	})
+	if err != nil {
+		t.Fatalf("NVWriteCertificate() failed: %v", err)
+	}
+
+	readCert, err := tpmutil.NVReadCertificate(thetpm, tpmutil.NVReadConfig{
+		Index: index,
+	})
+	if err != nil {
+		t.Fatalf("NVReadCertificate() failed: %v", err)
+	}
+
+	if !cert.Equal(readCert) {
+		t.Errorf("certificate read from NV index does not match written certificate: subject=%s", cert.Subject.CommonName)
+	}
+}
+
+func TestNVReadCertificates(t *testing.T) {
+	index := tpm2.TPMHandle(0x01C00001)
+
+	tests := []struct {
+		name     string
+		numCerts int
+	}{
+		{"single certificate", 1},
+		{"two certificates", 2},
+		{"three certificates", 3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			thetpm := testutil.OpenSimulator(t)
+			ca := tinyca.Must()
+
+			certs := make([]*x509.Certificate, tt.numCerts)
+			for i := 0; i < tt.numCerts; i++ {
+				cert, _, err := ca.Generate(tinyca.CertificateRequest{
+					Subject: pkix.Name{
+						CommonName: fmt.Sprintf("Test Certificate %d", i),
+					},
+				})
+				if err != nil {
+					t.Fatalf("ca.Generate() failed: %v", err)
+				}
+				certs[i] = cert
+			}
+
+			err := tpmutil.NVWriteCertificates(thetpm, certs, tpmutil.NVWriteConfig{
+				Index: index,
+			})
+			if err != nil {
+				t.Fatalf("NVWriteCertificates() failed: %v", err)
+			}
+
+			readCerts, err := tpmutil.NVReadCertificates(thetpm, tpmutil.NVReadConfig{
+				Index: index,
+			})
+			if err != nil {
+				t.Fatalf("NVReadCertificates() failed: %v", err)
+			}
+
+			if len(readCerts) != tt.numCerts {
+				t.Errorf("expected %d certificates, got %d", tt.numCerts, len(readCerts))
+			}
+
+			for i, readCert := range readCerts {
+				if !certs[i].Equal(readCert) {
+					t.Errorf("certificate %d does not match: expected subject=%s, got subject=%s",
+						i, certs[i].Subject.CommonName, readCert.Subject.CommonName)
+				}
+			}
+		})
+	}
+}
+
+func TestNVWriteCertificate(t *testing.T) {
+	thetpm := testutil.OpenSimulator(t)
+
+	ca := tinyca.Must()
+
+	cert, _, err := ca.Generate(tinyca.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Test Certificate",
+		},
+	})
+	if err != nil {
+		t.Fatalf("ca.Generate() failed: %v", err)
+	}
+
+	index := tpm2.TPMHandle(0x01C00001)
+
+	err = tpmutil.NVWriteCertificate(thetpm, cert, tpmutil.NVWriteConfig{
+		Index: index,
+	})
+	if err != nil {
+		t.Fatalf("NVWriteCertificate() failed: %v", err)
+	}
+
+	readCert, err := tpmutil.NVReadCertificate(thetpm, tpmutil.NVReadConfig{
+		Index: index,
+	})
+	if err != nil {
+		t.Fatalf("NVReadCertificate() failed: %v", err)
+	}
+
+	if !cert.Equal(readCert) {
+		t.Errorf("certificate read from NV index does not match written certificate: subject=%s", cert.Subject.CommonName)
+	}
+}
+
+func TestNVWriteCertificates(t *testing.T) {
+	index := tpm2.TPMHandle(0x01C00001)
+
+	tests := []struct {
+		name     string
+		numCerts int
+		wantErr  error
+	}{
+		{"empty array", 0, tpmutil.ErrNoCertificates},
+		{"single certificate", 1, nil},
+		{"two certificates", 2, nil},
+		{"three certificates", 3, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			thetpm := testutil.OpenSimulator(t)
+			ca := tinyca.Must()
+
+			certs := make([]*x509.Certificate, tt.numCerts)
+			for i := 0; i < tt.numCerts; i++ {
+				cert, _, err := ca.Generate(tinyca.CertificateRequest{
+					Subject: pkix.Name{
+						CommonName: fmt.Sprintf("Test Certificate %d", i),
+					},
+				})
+				if err != nil {
+					t.Fatalf("ca.Generate() failed: %v", err)
+				}
+				certs[i] = cert
+			}
+
+			err := tpmutil.NVWriteCertificates(thetpm, certs, tpmutil.NVWriteConfig{
+				Index: index,
+			})
+			if err != tt.wantErr {
+				t.Fatalf("NVWriteCertificates() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantErr != nil {
+				return
+			}
+
+			readCerts, err := tpmutil.NVReadCertificates(thetpm, tpmutil.NVReadConfig{
+				Index: index,
+			})
+			if err != nil {
+				t.Fatalf("NVReadCertificates() failed: %v", err)
+			}
+
+			if len(readCerts) != tt.numCerts {
+				t.Errorf("expected %d certificates, got %d", tt.numCerts, len(readCerts))
+			}
+
+			for i, readCert := range readCerts {
+				if !certs[i].Equal(readCert) {
+					t.Errorf("certificate %d does not match: expected subject=%s, got subject=%s",
+						i, certs[i].Subject.CommonName, readCert.Subject.CommonName)
 				}
 			}
 		})

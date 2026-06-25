@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/google/go-tpm v0.9.8
-	github.com/loicsikidi/go-utils v0.1.3
+	github.com/loicsikidi/go-utils v0.7.0
 	golang.org/x/term v0.38.0
 )
 

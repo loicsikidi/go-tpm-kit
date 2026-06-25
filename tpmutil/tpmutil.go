@@ -10,6 +10,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/asn1"
 	"errors"
 	"fmt"
@@ -87,6 +88,100 @@ func NVRead(t transport.TPM, optionalCfg ...NVReadConfig) ([]byte, error) {
 		return nil, err
 	}
 	return nvRead(t, cfg.Hierarchy, cfg.Index, cfg.Auth, cfg.BlockSize, cfg.MultiIndex)
+}
+
+// NVReadCertificate reads a certificate from a non-volatile storage (NV) index.
+//
+// Example:
+//
+//	cert, err := tpmutil.NVReadCertificate(tpm, tpmutil.NVReadConfig{
+//		Index:     0x01C00002,
+//		Hierarchy: tpm2.TPMRHOwner,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Printf("Certificate subject: %s\n", cert.Subject)
+func NVReadCertificate(t transport.TPM, optionalCfg ...NVReadConfig) (*x509.Certificate, error) {
+	cfg := goutils.OptionalArg(optionalCfg)
+	cfg.MultiIndex = true
+	data, err := NVRead(t, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return x509.ParseCertificate(data)
+}
+
+// NVReadCertificates reads multiple certificates from successive non-volatile storage (NV) indices.
+//
+// Example:
+//
+//	certs, err := tpmutil.NVReadCertificates(tpm, tpmutil.NVReadConfig{
+//		Index:      0x01C00002,
+//		Hierarchy:  tpm2.TPMRHOwner,
+//		MultiIndex: true,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Printf("Read %d certificates\n", len(certs))
+func NVReadCertificates(t transport.TPM, optionalCfg ...NVReadConfig) ([]*x509.Certificate, error) {
+	cfg := goutils.OptionalArg(optionalCfg)
+	cfg.MultiIndex = true
+	data, err := NVRead(t, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return x509.ParseCertificates(data)
+}
+
+// NVWriteCertificate writes a certificate to a non-volatile storage (NV) index.
+//
+// Example:
+//
+//	cert, err := tpmutil.NVWriteCertificate(tpm, tpmutil.NVWriteConfig{
+//		Index:     0x01C00002,
+//		Hierarchy: tpm2.TPMRHOwner,
+//	}, cert)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+func NVWriteCertificate(t transport.TPM, cert *x509.Certificate, optionalCfg ...NVWriteConfig) error {
+	if cert == nil {
+		return ErrMissingCert
+	}
+	cfg := goutils.OptionalArg(optionalCfg)
+	cfg.Data = cert.Raw
+	return NVWrite(t, cfg)
+}
+
+// NVWriteCertificates writes multiple certificates to successive non-volatile storage (NV) indices.
+//
+// The certificates are concatenated and written across multiple NV indices using [NVWriteConfig.MultiIndex].
+//
+// Example:
+//
+//	err := tpmutil.NVWriteCertificates(tpm, certs, tpmutil.NVWriteConfig{
+//		Index:     0x01C00002,
+//		Hierarchy: tpm2.TPMRHOwner,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+func NVWriteCertificates(t transport.TPM, certs []*x509.Certificate, optionalCfg ...NVWriteConfig) error {
+	if len(certs) == 0 {
+		return ErrNoCertificates
+	}
+
+	var bundle []byte
+	for _, cert := range certs {
+		bundle = append(bundle, cert.Raw...)
+	}
+
+	cfg := goutils.OptionalArg(optionalCfg)
+	cfg.Data = bundle
+	cfg.MultiIndex = true
+	return NVWrite(t, cfg)
 }
 
 func nvRead(t transport.TPM, hierarchy, index tpm2.TPMHandle, auth tpm2.Session, blockSize int, multiIndex bool) ([]byte, error) {
@@ -1010,6 +1105,12 @@ func Load(t transport.TPM, optionalCfg ...LoadConfig) (HandleCloser, error) {
 // Use [CreateWithResult] if you need the encrypted private/public portions
 // for later use without loading the key immediately.
 //
+// If [CreateConfig.PersistConfig] is set, the created key will be automatically
+// persisted to the specified persistent handle. In this case, the returned handle
+// will be a persistent handle.
+// WARNING: when [CreateConfig.PersistConfig] is used, [PersistConfig.SkipFlush] is
+// ignored.
+//
 // Example:
 //
 //	// Create a child key under an existing parent
@@ -1037,12 +1138,34 @@ func Create(t transport.TPM, optionalCfg ...CreateConfig) (HandleCloser, error) 
 		return nil, err
 	}
 
-	return Load(t, LoadConfig{
+	transientHandle, err := Load(t, LoadConfig{
 		ParentHandle: cfg.ParentHandle,
 		InPrivate:    result.OutPrivate,
 		InPublic:     result.OutPublic,
 		ParentAuth:   cfg.ParentAuth,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.PersistConfig != nil {
+		cfg.PersistConfig.TransientHandle = transientHandle
+
+		persistedHandle, err := Persist(t, *cfg.PersistConfig)
+		if err != nil {
+			_ = transientHandle.Close()
+			return nil, err
+		}
+
+		hc, err := ToHandleCloser(t, persistedHandle)
+		if err != nil {
+			_ = transientHandle.Close()
+			return nil, err
+		}
+		return hc, nil
+	}
+
+	return transientHandle, nil
 }
 
 // CreateWithResult creates a child key under a parent key in the TPM and returns the result.
