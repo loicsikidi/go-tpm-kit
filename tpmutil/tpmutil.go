@@ -1108,8 +1108,8 @@ func Load(t transport.TPM, optionalCfg ...LoadConfig) (HandleCloser, error) {
 // If [CreateConfig.PersistConfig] is set, the created key will be automatically
 // persisted to the specified persistent handle. In this case, the returned handle
 // will be a persistent handle.
-// WARNING: when [CreateConfig.PersistConfig] is used, [CreateConfig.SkipFlush] is
-// ignored and will always flush the transient handle.
+// WARNING: when [CreateConfig.PersistConfig] is used, [PersistConfig.SkipFlush] is
+// ignored.
 //
 // Example:
 //
