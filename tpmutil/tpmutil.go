@@ -1263,6 +1263,21 @@ func CloseHandle(t transport.TPM, handle Handle) error {
 	return nil
 }
 
+func getPublic(t transport.TPM, h Handle) (*tpm2.TPMTPublic, error) {
+	var public *tpm2.TPMTPublic
+	getter, ok := h.(PublicGetter)
+	if ok && getter.HasPublic() {
+		public = getter.Public()
+	} else {
+		pa, err := getPublicArea(t, h)
+		if err != nil {
+			return nil, err
+		}
+		public = pa.public
+	}
+	return public, nil
+}
+
 type publicArea struct {
 	public        *tpm2.TPMTPublic
 	Name          tpm2.TPM2BName
