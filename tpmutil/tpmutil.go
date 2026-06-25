@@ -109,7 +109,18 @@ func NVReadCertificate(t transport.TPM, optionalCfg ...NVReadConfig) (*x509.Cert
 	if err != nil {
 		return nil, err
 	}
-	return x509.ParseCertificate(data)
+
+	cert, err := x509.ParseCertificate(data)
+	if err != nil {
+		// Fallback to single index read
+		cfg.MultiIndex = false
+		data, readErr := NVRead(t, cfg)
+		if readErr != nil {
+			return nil, readErr
+		}
+		return x509.ParseCertificate(data)
+	}
+	return cert, nil
 }
 
 // NVReadCertificates reads multiple certificates from successive non-volatile storage (NV) indices.
