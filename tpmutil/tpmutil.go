@@ -180,13 +180,12 @@ func NVWriteCertificate(t transport.TPM, cert *x509.Certificate, optionalCfg ...
 //		log.Fatal(err)
 //	}
 func NVWriteCertificates(t transport.TPM, certs []*x509.Certificate, optionalCfg ...NVWriteConfig) error {
-	if len(certs) == 0 {
-		return ErrNoCertificates
-	}
+	bundle := goutils.Reduce(certs, []byte{}, func(acc []byte, cert *x509.Certificate) []byte {
+		return append(acc, cert.Raw...)
+	})
 
-	var bundle []byte
-	for _, cert := range certs {
-		bundle = append(bundle, cert.Raw...)
+	if len(bundle) == 0 {
+		return ErrNoCertificates
 	}
 
 	cfg := goutils.OptionalArg(optionalCfg)
