@@ -99,7 +99,14 @@ func TestNewEKCertificate(t *testing.T) {
 				t.Fatalf("failed to parse certificate: %v", err)
 			}
 
-			ekCert, err := New(cert, Config{StrictModeEnabled: true})
+			var enableStrictMode bool
+			if tt.name == "ok wihout revocation check" {
+				enableStrictMode = false
+			} else {
+				enableStrictMode = true
+			}
+
+			ekCert, err := New(cert, Config{StrictModeEnabled: enableStrictMode})
 			if err != nil {
 				t.Fatalf("failed to create EKCertificate: %v", err)
 			}
