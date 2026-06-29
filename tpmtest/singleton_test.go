@@ -11,10 +11,7 @@ import (
 
 func TestSingletonSigners(t *testing.T) {
 	// Get CA without HTTP server
-	ca1, err := GetEndorsementCA()
-	if err != nil {
-		t.Fatalf("failed to get CA: %v", err)
-	}
+	ca1 := GetEndorsementCA()
 
 	// Get CA with HTTP server
 	ca2, err := getEndorsementCAWithHTTPServer("http://localhost:8080")

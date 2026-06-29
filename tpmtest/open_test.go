@@ -65,10 +65,7 @@ func verifyCertInNV(t *testing.T, tpm transport.TPM, index tpm2.TPMHandle) {
 		t.Fatalf("ParseCertificate failed: %v", err)
 	}
 
-	ca, err := tpmtest.GetEndorsementCA()
-	if err != nil {
-		t.Fatalf("GetEndorsementCA failed: %v", err)
-	}
+	ca := tpmtest.GetEndorsementCA()
 
 	if err := ca.Verify(cert); err != nil {
 		t.Errorf("certificate chain verification failed: %v", err)

@@ -13,23 +13,26 @@ import (
 	"crypto/x509/pkix"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/google/go-tpm/tpm2/transport"
-	"github.com/google/go-tpm/tpm2/transport/simulator"
 
 	"github.com/loicsikidi/go-tpm-kit/tpmcert/ekca"
+	"github.com/loicsikidi/go-tpm-kit/tpmutil"
 	goutils "github.com/loicsikidi/go-utils"
 )
 
 var (
 	caOnce     sync.Once
 	caInstance *ekca.CA
-	caErr      error
 
 	httpServerMu    sync.Mutex
 	httpServerCache = make(map[string]*HTTPServer)
 
+	// CA used in [OpenSimulator] or returned by [GetEndorsementCA] relies the same key pair
+	// for root and intermediate. These keys are created when the pkg is used for the first time
+	// and then cached.
+	//
+	// This allow to get a predictable behavior.
 	rootSigner         crypto.Signer
 	intermediateSigner crypto.Signer
 )
@@ -47,50 +50,15 @@ func init() {
 	}
 }
 
-const (
-	// defaultRootValidity is the default validity period for root certificates.
-	defaultRootValidity = 1 * time.Hour
-	// defaultIntermediateValidity is the default validity period for intermediate certificates.
-	defaultIntermediateValidity = 30 * time.Minute
-)
-
 // GetEndorsementCA returns the singleton [ekca.CA] instance.
 //
 // This ensures all EK certificates are signed by the same CA across all tests.
-func GetEndorsementCA() (*ekca.CA, error) {
+func GetEndorsementCA() *ekca.CA {
 	caOnce.Do(func() {
-		cfg := ekca.CAConfig{
-			Root: &ekca.CertConfig{
-				Subject: &pkix.Name{
-					Organization: []string{"go-tpm-kit"},
-					CommonName:   "TPM Simulator Root CA",
-				},
-				Validity: defaultRootValidity,
-				Signer:   rootSigner,
-			},
-			Intermediate: &ekca.CertConfig{
-				Subject: &pkix.Name{
-					Organization: []string{"go-tpm-kit"},
-					CommonName:   "TPM Simulator Intermediate CA",
-				},
-				Validity: defaultIntermediateValidity,
-				Signer:   intermediateSigner,
-			},
-		}
-		caInstance, caErr = ekca.New(cfg)
+		cfg := tpmutil.GetDefaultCAConfig(rootSigner, intermediateSigner)
+		caInstance = ekca.Must(cfg)
 	})
-	return caInstance, caErr
-}
-
-// MustGetEndorsementCA returns the singleton [ekca.CA] instance.
-//
-// This function panics if the CA cannot be created.
-func MustGetEndorsementCA() *ekca.CA {
-	ca, err := GetEndorsementCA()
-	if err != nil {
-		panic(err)
-	}
-	return ca
+	return caInstance
 }
 
 // GetHTTPServer returns the HTTP server associated with the given test.
@@ -108,7 +76,7 @@ func getEndorsementCAWithHTTPServer(baseURL string) (*ekca.CA, error) {
 				Organization: []string{"go-tpm-kit"},
 				CommonName:   "TPM Simulator Root CA",
 			},
-			Validity:              defaultRootValidity,
+			Validity:              tpmutil.DefaultRootValidity,
 			Signer:                rootSigner,
 			CRLDistributionPoints: []string{baseURL + "/crl/root"},
 		},
@@ -117,7 +85,7 @@ func getEndorsementCAWithHTTPServer(baseURL string) (*ekca.CA, error) {
 				Organization: []string{"go-tpm-kit"},
 				CommonName:   "TPM Simulator Intermediate CA",
 			},
-			Validity:              defaultIntermediateValidity,
+			Validity:              tpmutil.DefaultIntermediateValidity,
 			Signer:                intermediateSigner,
 			IssuingCertificateURL: []string{baseURL + "/issuer/root"},
 			CRLDistributionPoints: []string{baseURL + "/crl/root"},
@@ -201,15 +169,14 @@ func (c *OpenConfig) CheckAndSetDefaults() error {
 func OpenSimulator(t *testing.T, optionalCfg ...OpenConfig) transport.TPMCloser {
 	t.Helper()
 
-	tpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatalf("could not connect to TPM simulator: %v", err)
-	}
 	cfg := goutils.OptionalArg(optionalCfg)
-	if !cfg.SkipProvisioning {
-		var httpServer *HTTPServer
-		var ca *ekca.CA
 
+	var httpServer *HTTPServer
+	var ca *ekca.CA
+	var err error
+
+	// Setup HTTP server and CA if needed
+	if !cfg.SkipProvisioning {
 		if cfg.EnableHTTPServer {
 			httpServer = NewHTTPServer()
 
@@ -232,20 +199,39 @@ func OpenSimulator(t *testing.T, optionalCfg ...OpenConfig) transport.TPMCloser 
 				removeHTTPServer(t)
 			})
 		} else {
-			ca, err = GetEndorsementCA()
-			if err != nil {
-				t.Fatalf("failed to get CA: %v", err)
-			}
+			ca = GetEndorsementCA()
 		}
-
-		initSimu(t, tpm, cfg, ca, httpServer)
 	}
+
+	simCfg := tpmutil.SimulatorConfig{
+		EKCerts:          cfg.EKCerts,
+		SkipProvisioning: cfg.SkipProvisioning,
+		CA:               ca,
+	}
+
+	if httpServer != nil {
+		simCfg.CertOptions = &tpmutil.EKCertOptions{
+			IssuingCertificateURL: []string{httpServer.IssuerURL(CATypeIntermediate)},
+			CRLDistributionPoints: []string{httpServer.CRLURL(CATypeIntermediate)},
+		}
+	}
+
+	sim, err := tpmutil.OpenSimulator(simCfg)
+	if err != nil {
+		if httpServer != nil {
+			httpServer.Close()
+			removeHTTPServer(t)
+		}
+		t.Fatalf("could not open TPM simulator: %v", err)
+	}
+
 	if !cfg.SkipCleanup {
 		t.Cleanup(func() {
-			if err := tpm.Close(); err != nil {
+			if err := sim.Close(); err != nil {
 				t.Errorf("could not close TPM simulator: %v", err)
 			}
 		})
 	}
-	return tpm
+
+	return sim.TPM().(transport.TPMCloser)
 }
