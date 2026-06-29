@@ -21,7 +21,7 @@ func TestHTTPServer_Endpoints(t *testing.T) {
 	defer server.Close()
 
 	// Create and initialize CA
-	ca := tpmtest.MustGetEndorsementCA()
+	ca := tpmtest.GetEndorsementCA()
 	if err := server.Initialize(ca); err != nil {
 		t.Fatalf("failed to initialize HTTP server: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestHTTPServer_MethodNotAllowed(t *testing.T) {
 	server := tpmtest.NewHTTPServer()
 	defer server.Close()
 
-	ca := tpmtest.MustGetEndorsementCA()
+	ca := tpmtest.GetEndorsementCA()
 	if err := server.Initialize(ca); err != nil {
 		t.Fatalf("failed to initialize HTTP server: %v", err)
 	}

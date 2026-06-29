@@ -175,6 +175,26 @@ func New(optionalCfg ...CAConfig) (*CA, error) {
 	}, nil
 }
 
+// Must is a helper that wraps [New] and panics if an error occurs.
+//
+// Example:
+//
+//	ca := ekca.Must()
+//	ca := ekca.Must(ekca.CAConfig{
+//	    Root: &ekca.CertConfig{
+//	        Subject: &pkix.Name{
+//	            Organization: []string{"My Org"},
+//	        },
+//	    },
+//	})
+func Must(optionalCfg ...CAConfig) *CA {
+	ca, err := New(optionalCfg...)
+	if err != nil {
+		panic(err)
+	}
+	return ca
+}
+
 // Verify checks that cert was issued by this CA.
 //
 // It clears [x509.Certificate.UnhandledCriticalExtensions] before verification
