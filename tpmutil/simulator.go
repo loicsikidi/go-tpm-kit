@@ -74,7 +74,11 @@ type SimulatorConfig struct {
 func (c *SimulatorConfig) CheckAndSetDefaults() error {
 	if !c.SkipProvisioning {
 		if c.CA == nil {
-			c.CA = createDefaultCA()
+			ca, err := createDefaultCA()
+			if err != nil {
+				return fmt.Errorf("failed to create CA: %w", err)
+			}
+			c.CA = ca
 		}
 		if len(c.EKCerts) == 0 {
 			c.EKCerts = []Template{TemplateRSA, TemplateECC}
@@ -89,7 +93,7 @@ func (c *SimulatorConfig) CheckAndSetDefaults() error {
 				TPMVersion:      defaultTPMVersion,
 			}
 		}
-		if c.CertOptions.ValidityMinutes == 0 {
+		if c.CertOptions.ValidityMinutes <= 0 {
 			c.CertOptions.ValidityMinutes = defaultValidityMinutes
 		}
 	}
@@ -214,11 +218,11 @@ func GetDefaultCAConfig(rootSigner, intermediateSigner crypto.Signer) ekca.CACon
 }
 
 // createDefaultCA creates a simple CA with default settings
-func createDefaultCA() *ekca.CA {
+func createDefaultCA() (*ekca.CA, error) {
 	// we delegate key generation to the ekca
 	cfg := GetDefaultCAConfig(
 		/* rootSigner = */ nil,
 		/* intermediateSigner = */ nil,
 	)
-	return ekca.Must(cfg)
+	return ekca.New(cfg)
 }
