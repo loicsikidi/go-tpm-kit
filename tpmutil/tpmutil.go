@@ -1122,7 +1122,7 @@ func RemoveNVRAMIndex(t transport.TPM, cfg RemoveNVRAMIndexConfig) error {
 
 func removeMultipleIndices(t transport.TPM, hierarchy, baseIndex tpm2.TPMHandle, auth tpm2.Session) error {
 	// defensive approach to avoid infinite loop or excessive indices
-	for chunkIdx := 0; chunkIdx < maxIndexCount; chunkIdx++ {
+	for chunkIdx := range maxIndexCount {
 		currentIndex := tpm2.TPMHandle(uint32(baseIndex) + uint32(chunkIdx))
 
 		err := removeNVRAMSingleIndex(t, hierarchy, currentIndex, auth)
