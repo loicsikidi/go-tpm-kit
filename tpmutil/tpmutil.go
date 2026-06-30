@@ -107,6 +107,9 @@ func NVReadCertificate(t transport.TPM, optionalCfg ...NVReadConfig) (*x509.Cert
 	cfg.MultiIndex = true
 	data, err := NVRead(t, cfg)
 	if err != nil {
+		if errors.Is(err, tpm2.TPMRCHandle) {
+			return nil, ErrCertificateNotFound
+		}
 		return nil, err
 	}
 
@@ -116,6 +119,9 @@ func NVReadCertificate(t transport.TPM, optionalCfg ...NVReadConfig) (*x509.Cert
 		cfg.MultiIndex = false
 		data, readErr := NVRead(t, cfg)
 		if readErr != nil {
+			if errors.Is(readErr, tpm2.TPMRCHandle) {
+				return nil, ErrCertificateNotFound
+			}
 			return nil, readErr
 		}
 		return x509.ParseCertificate(data)
@@ -681,8 +687,7 @@ func formatRSASignature(sig tpm2.TPMTSignature, alg tpm2.TPMAlgID) ([]byte, erro
 //		log.Fatal(err)
 //	}
 //	fmt.Printf("Key handle: 0x%x\n", handle.Handle())
-func GetPersistedKeyHandle(t transport.TPM, optionalCfg ...GetPersistedKeyHandleConfig) (HandleCloser, error) {
-	cfg := goutils.OptionalArg(optionalCfg)
+func GetPersistedKeyHandle(t transport.TPM, cfg GetPersistedKeyHandleConfig) (HandleCloser, error) {
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, err
 	}
@@ -977,6 +982,191 @@ func Persist(t transport.TPM, optionalCfg ...PersistConfig) (Handle, error) {
 	})
 
 	return persistedHandle, nil
+}
+
+// Remove removes a persistent key from the TPM at the specified handle.
+//
+// This function is idempotent: if the key does not exist at the specified handle,
+// it returns nil without error.
+//
+// When [RemoveConfig.CertHandle] is specified, the certificate NV index is also removed.
+// When [RemoveConfig.CertChainHandle] is specified (requires CertHandle), multiple
+// successive certificate chain NV indices are removed until a non-existent index is encountered.
+//
+// Examples:
+//
+//	// Remove a persistent key
+//	err := tpmutil.Remove(tpm, tpmutil.RemoveConfig{
+//		Handle: tpmutil.NewHandle(tpm2.TPMHandle(0x81000001)),
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Remove persistent key with certificate and certificate chain
+//	err = tpmutil.Remove(tpm, tpmutil.RemoveConfig{
+//		Handle:          tpmutil.NewHandle(tpm2.TPMHandle(0x81000001)),
+//		CertHandle:      tpm2.TPMHandle(0x01C00002),
+//		CertChainHandle: tpm2.TPMHandle(0x01C00010),
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+func Remove(t transport.TPM, cfg RemoveConfig) error {
+	if err := cfg.CheckAndSetDefaults(); err != nil {
+		return err
+	}
+
+	pa, err := getPublicArea(t, cfg.Handle.Handle())
+	if err != nil {
+		if !errors.Is(err, tpm2.TPMRCHandle) {
+			return err
+		}
+	} else {
+		existingHandle := NewHandle(&tpm2.NamedHandle{
+			Handle: cfg.Handle.Handle(),
+			Name:   pa.Name,
+		})
+
+		_, err = tpm2.EvictControl{
+			Auth:             ToAuthHandle(NewHandle(cfg.Hierarchy), cfg.Auth),
+			ObjectHandle:     existingHandle,
+			PersistentHandle: cfg.Handle.Handle(),
+		}.Execute(t)
+		if err != nil {
+			return fmt.Errorf("failed to evict key at handle 0x%x: %w", cfg.Handle.Handle(), err)
+		}
+	}
+
+	if cfg.CertHandle != 0 {
+		err := removeNVRAMSingleIndex(t, cfg.Hierarchy, cfg.CertHandle, cfg.Auth)
+		var notFoundErr *ErrHandleNotFound
+		if err != nil && !errors.As(err, &notFoundErr) {
+			return err
+		}
+	}
+
+	if cfg.CertChainHandle != 0 {
+		if err := removeMultipleIndices(t, cfg.Hierarchy, cfg.CertChainHandle, cfg.Auth); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// RemoveNVRAMIndex removes an NV index from the TPM.
+//
+// This function is idempotent: if the NV index does not exist,
+// it returns nil without error.
+//
+// By default, only a single NV index is removed.
+// When [RemoveNVRAMIndexConfig.MultiIndex] is true, all successive NV indices
+// are removed starting from the base index until a non-existent index is encountered.
+//
+// When [RemoveNVRAMIndexConfig.CertHandle] is specified, the certificate index is also removed.
+// When [RemoveNVRAMIndexConfig.CertChainHandle] is specified (requires CertHandle), multiple
+// successive certificate chain indices are removed until a non-existent index is encountered.
+//
+// Examples:
+//
+//	// Remove a single NV index
+//	err := tpmutil.RemoveNVRAMIndex(tpm, tpmutil.RemoveNVRAMIndexConfig{
+//		Index:     tpm2.TPMHandle(0x01500000),
+//		Hierarchy: tpm2.TPMRHOwner,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Remove multiple successive NV indices
+//	// This will remove 0x01500000, 0x01500001, 0x01500002, etc.
+//	// until a non-existent index is encountered
+//	err = tpmutil.RemoveNVRAMIndex(tpm, tpmutil.RemoveNVRAMIndexConfig{
+//		Index:      tpm2.TPMHandle(0x01500000),
+//		Hierarchy:  tpm2.TPMRHOwner,
+//		MultiIndex: true,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Remove primary index with certificate and certificate chain
+//	err = tpmutil.RemoveNVRAMIndex(tpm, tpmutil.RemoveNVRAMIndexConfig{
+//		Index:           tpm2.TPMHandle(0x01500000),
+//		CertHandle:      tpm2.TPMHandle(0x01C00002),
+//		CertChainHandle: tpm2.TPMHandle(0x01C00010),
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+func RemoveNVRAMIndex(t transport.TPM, cfg RemoveNVRAMIndexConfig) error {
+	if err := cfg.CheckAndSetDefaults(); err != nil {
+		return err
+	}
+
+	if cfg.MultiIndex {
+		if err := removeMultipleIndices(t, cfg.Hierarchy, cfg.Index, cfg.Auth); err != nil {
+			return err
+		}
+	} else {
+		err := removeNVRAMSingleIndex(t, cfg.Hierarchy, cfg.Index, cfg.Auth)
+		var notFoundErr *ErrHandleNotFound
+		if err != nil && !errors.As(err, &notFoundErr) {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func removeMultipleIndices(t transport.TPM, hierarchy, baseIndex tpm2.TPMHandle, auth tpm2.Session) error {
+	// defensive approach to avoid infinite loop or excessive indices
+	for chunkIdx := 0; chunkIdx < maxIndexCount; chunkIdx++ {
+		currentIndex := tpm2.TPMHandle(uint32(baseIndex) + uint32(chunkIdx))
+
+		err := removeNVRAMSingleIndex(t, hierarchy, currentIndex, auth)
+		if err != nil {
+			var notFoundErr *ErrHandleNotFound
+			if errors.As(err, &notFoundErr) {
+				// If we get a not found error on the first index, it's OK (idempotent)
+				if chunkIdx == 0 {
+					return nil
+				}
+				// Otherwise, we've reached the end of consecutive indices
+				break
+			}
+			// For other errors, propagate them
+			return err
+		}
+	}
+
+	return nil
+}
+
+func removeNVRAMSingleIndex(t transport.TPM, hierarchy, index tpm2.TPMHandle, auth tpm2.Session) error {
+	readPubRsp, err := tpm2.NVReadPublic{
+		NVIndex: index,
+	}.Execute(t)
+	if err != nil {
+		if errors.Is(err, tpm2.TPMRCHandle) {
+			return &ErrHandleNotFound{Handle: index, Err: err}
+		}
+		return err
+	}
+
+	_, err = tpm2.NVUndefineSpace{
+		AuthHandle: ToAuthHandle(NewHandle(hierarchy), auth),
+		NVIndex: tpm2.NamedHandle{
+			Handle: index,
+			Name:   readPubRsp.NVName,
+		},
+	}.Execute(t)
+	if err != nil {
+		return fmt.Errorf("failed to undefine NV space at index 0x%x: %w", index, err)
+	}
+
+	return nil
 }
 
 // CreatePrimary creates a primary key in the TPM and returns a [HandleCloser].
