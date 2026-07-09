@@ -1064,10 +1064,6 @@ func Remove(t transport.TPM, cfg RemoveConfig) error {
 // When [RemoveNVRAMIndexConfig.MultiIndex] is true, all successive NV indices
 // are removed starting from the base index until a non-existent index is encountered.
 //
-// When [RemoveNVRAMIndexConfig.CertHandle] is specified, the certificate index is also removed.
-// When [RemoveNVRAMIndexConfig.CertChainHandle] is specified (requires CertHandle), multiple
-// successive certificate chain indices are removed until a non-existent index is encountered.
-//
 // Examples:
 //
 //	// Remove a single NV index
@@ -1086,16 +1082,6 @@ func Remove(t transport.TPM, cfg RemoveConfig) error {
 //		Index:      tpm2.TPMHandle(0x01500000),
 //		Hierarchy:  tpm2.TPMRHOwner,
 //		MultiIndex: true,
-//	})
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//
-//	// Remove primary index with certificate and certificate chain
-//	err = tpmutil.RemoveNVRAMIndex(tpm, tpmutil.RemoveNVRAMIndexConfig{
-//		Index:           tpm2.TPMHandle(0x01500000),
-//		CertHandle:      tpm2.TPMHandle(0x01C00002),
-//		CertChainHandle: tpm2.TPMHandle(0x01C00010),
 //	})
 //	if err != nil {
 //		log.Fatal(err)
@@ -1124,23 +1110,14 @@ func removeMultipleIndices(t transport.TPM, hierarchy, baseIndex tpm2.TPMHandle,
 	// defensive approach to avoid infinite loop or excessive indices
 	for chunkIdx := range maxIndexCount {
 		currentIndex := tpm2.TPMHandle(uint32(baseIndex) + uint32(chunkIdx))
-
-		err := removeNVRAMSingleIndex(t, hierarchy, currentIndex, auth)
-		if err != nil {
+		if err := removeNVRAMSingleIndex(t, hierarchy, currentIndex, auth); err != nil {
 			var notFoundErr *ErrHandleNotFound
 			if errors.As(err, &notFoundErr) {
-				// If we get a not found error on the first index, it's OK (idempotent)
-				if chunkIdx == 0 {
-					return nil
-				}
-				// Otherwise, we've reached the end of consecutive indices
-				break
+				return nil
 			}
-			// For other errors, propagate them
 			return err
 		}
 	}
-
 	return nil
 }
 
