@@ -168,23 +168,23 @@ func TestGetKeyHandle_OrdinaryKey(t *testing.T) {
 	}
 }
 
-func TestGetKeyHandle_ConfigValidation(t *testing.T) {
+func TestGetPersistedKeyHandle_ConfigValidation(t *testing.T) {
 	thetpm := testutil.OpenSimulator(t)
 
 	tests := []struct {
 		name    string
-		cfg     []tpmutil.GetPersistedKeyHandleConfig
+		cfg     tpmutil.GetPersistedKeyHandleConfig
 		wantErr bool
 	}{
 		{
 			name:    "nil config (zero value)",
-			cfg:     nil,
+			cfg:     tpmutil.GetPersistedKeyHandleConfig{},
 			wantErr: true,
 		},
 		{
 			name: "transient handle rejected",
-			cfg: []tpmutil.GetPersistedKeyHandleConfig{
-				{Handle: tpmutil.NewHandle(tpm2.TPMHandle(0x80000001))},
+			cfg: tpmutil.GetPersistedKeyHandleConfig{
+				Handle: tpmutil.NewHandle(tpm2.TPMHandle(0x80000001)),
 			},
 			wantErr: true,
 		},
@@ -192,7 +192,7 @@ func TestGetKeyHandle_ConfigValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := tpmutil.GetPersistedKeyHandle(thetpm, tt.cfg...)
+			_, err := tpmutil.GetPersistedKeyHandle(thetpm, tt.cfg)
 			if tt.wantErr && err == nil {
 				t.Error("expected error, got nil")
 			}

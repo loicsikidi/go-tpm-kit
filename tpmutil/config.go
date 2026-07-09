@@ -7,6 +7,7 @@ package tpmutil
 
 import (
 	"crypto"
+	"errors"
 	"fmt"
 
 	"github.com/google/go-tpm/tpm2"
@@ -657,6 +658,89 @@ func (c *PersistConfig) CheckAndSetDefaults() error {
 	}
 	if c.PersistentHandle.Type() != PersistentHandle {
 		return fmt.Errorf("invalid value: 'PersistentHandle' must be a persistent TPM handle (got %v)", c.PersistentHandle.Type())
+	}
+	if c.Hierarchy == 0 {
+		c.Hierarchy = tpm2.TPMRHOwner
+	}
+	if c.Auth == nil {
+		c.Auth = NoAuth
+	}
+	return nil
+}
+
+// RemoveConfig holds configuration for removing a persistent key.
+type RemoveConfig struct {
+	// Handle is the persistent handle to remove.
+	//
+	// Required.
+	Handle Handle
+	// Hierarchy specifies which TPM hierarchy to use.
+	//
+	// Default: [tpm2.TPMRHOwner].
+	Hierarchy tpm2.TPMHandle
+	// Auth is the authorization session for the hierarchy.
+	//
+	// Default: [NoAuth].
+	Auth tpm2.Session
+	// CertHandle is the NV index where a certificate is stored.
+	// When set, this index will be removed after the primary handle.
+	//
+	// Optional.
+	CertHandle tpm2.TPMHandle
+	// CertChainHandle is the NV index where a certificate chain is stored.
+	// When set, multiple successive indices starting from this handle are removed.
+	// This field is only used when CertHandle is also specified.
+	//
+	// Optional.
+	CertChainHandle tpm2.TPMHandle
+}
+
+func (c *RemoveConfig) CheckAndSetDefaults() error {
+	if c.Handle == nil {
+		return ErrMissingHandle
+	}
+	if c.Handle.Type() != PersistentHandle {
+		return fmt.Errorf("invalid value: 'Handle' must be a persistent TPM handle (got %v)", c.Handle.Type())
+	}
+	if c.Hierarchy == 0 {
+		c.Hierarchy = tpm2.TPMRHOwner
+	}
+	if c.Auth == nil {
+		c.Auth = NoAuth
+	}
+	if c.CertChainHandle != 0 && c.CertHandle == 0 {
+		return errors.New("CertChainHandle can only be used when CertHandle is specified")
+	}
+	return nil
+}
+
+// RemoveNVRAMIndexConfig holds configuration for removing an NV index.
+type RemoveNVRAMIndexConfig struct {
+	// Index is the NV index to remove.
+	//
+	// Required.
+	Index tpm2.TPMHandle
+	// Hierarchy specifies which TPM hierarchy to use.
+	//
+	// Default: [tpm2.TPMRHOwner].
+	Hierarchy tpm2.TPMHandle
+	// Auth is the authorization session for the hierarchy.
+	//
+	// Default: [NoAuth].
+	Auth tpm2.Session
+	// MultiIndex enables deleting multiple successive NV indices.
+	//
+	// When false (default), only the single NV index specified by Index is removed.
+	// When true, successive indices starting from Index are removed
+	// until a non-existent index is encountered.
+	//
+	// Default: false.
+	MultiIndex bool
+}
+
+func (c *RemoveNVRAMIndexConfig) CheckAndSetDefaults() error {
+	if c.Index == 0 {
+		return ErrMissingIndex
 	}
 	if c.Hierarchy == 0 {
 		c.Hierarchy = tpm2.TPMRHOwner
