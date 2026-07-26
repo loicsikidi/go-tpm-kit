@@ -9,6 +9,7 @@ import (
 	"crypto"
 	"crypto/x509/pkix"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/go-tpm/tpm2"
@@ -101,18 +102,32 @@ func (c *SimulatorConfig) CheckAndSetDefaults() error {
 }
 
 // Simulator represents a TPM simulator instance with provisioned EK certificates.
+//
+// This struct wraps a TPM transport with a mutex to ensure thread-safe access.
+// The underlying simulator transport uses a [bytes.Buffer] which is not safe for
+// concurrent use.
 type Simulator struct {
+	mu  sync.Mutex
 	tpm transport.TPMCloser
 }
 
-// TPM returns the underlying TPM transport.
-func (s *Simulator) TPM() transport.TPM {
-	return s.tpm
+// Send implements [transport.TPM].
+func (s *Simulator) Send(input []byte) ([]byte, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.tpm.Send(input)
 }
 
-// Close closes the simulator and releases resources.
+// Close implements [io.Closer].
 func (s *Simulator) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return s.tpm.Close()
+}
+
+// TPM returns a non-closable transport
+func (s *Simulator) TPM() transport.TPM {
+	return s
 }
 
 // OpenSimulator opens a TPM simulator and optionally provisions it with EK certificates.
