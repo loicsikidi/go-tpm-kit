@@ -118,18 +118,16 @@ func (s *Simulator) Send(input []byte) ([]byte, error) {
 	return s.tpm.Send(input)
 }
 
-// TPM returns the underlying TPM transport.
-func (s *Simulator) TPM() transport.TPM {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.tpm
-}
-
 // Close implements [io.Closer].
 func (s *Simulator) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.tpm.Close()
+}
+
+// TPM returns a non-closable transport
+func (s *Simulator) TPM() transport.TPM {
+	return s
 }
 
 // OpenSimulator opens a TPM simulator and optionally provisions it with EK certificates.
